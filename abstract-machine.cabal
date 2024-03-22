@@ -23,19 +23,24 @@ extra-source-files:
   README.md
 
 common shared
-  ghc-options:
-    -Wall
-
+  ghc-options:        -Wall
   default-extensions:
     DeriveFoldable
     DeriveFunctor
     DeriveTraversable
     OverloadedStrings
     TupleSections
+    ImportQualifiedPost
+
+  other-modules:
+    AbstractMachine
+    AST
 
   build-depends:
     , base
     , containers
+    , directory
+    , filepath
     , parsec
 
   hs-source-dirs:     src
