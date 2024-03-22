@@ -14,6 +14,9 @@ repl *ARGS:
 fmt:
     treefmt
 
+build:
+    cabal build
+
 # Run ghcid -- auto-recompile and run `main` function
 watch:
     ghcid -c "cabal repl exe:abstract-machine" --warnings -T :main
