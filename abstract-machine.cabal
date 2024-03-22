@@ -28,9 +28,9 @@ common shared
     DeriveFoldable
     DeriveFunctor
     DeriveTraversable
+    ImportQualifiedPost
     OverloadedStrings
     TupleSections
-    ImportQualifiedPost
 
   other-modules:
     AbstractMachine
