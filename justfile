@@ -15,5 +15,8 @@ fmt:
     treefmt
 
 # Run ghcid -- auto-recompile and run `main` function
-run:
+watch:
     ghcid -c "cabal repl exe:abstract-machine" --warnings -T :main
+
+run *ARGS: build
+    cabal run rescript-non-interference {{ARGS}}
