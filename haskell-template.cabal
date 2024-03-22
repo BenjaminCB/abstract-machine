@@ -1,0 +1,44 @@
+cabal-version:      2.4
+name:               haskell-template
+version:            0.1.0.0
+license:            MIT
+copyright:          2023 BenjaminCB
+maintainer:         benjamincb@hotmail.dk
+author:             BenjaminCB
+category:           Web
+homepage:           https://github.com/BenjaminCB/haskell-template
+
+-- TODO: Before hackage release.
+-- A short (one-line) description of the package.
+synopsis:           A template for Haskell projects using Nix
+
+-- A longer description of the package.
+-- description:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+
+extra-source-files:
+  LICENSE
+  README.md
+
+common shared
+  ghc-options:
+    -Wall
+
+  default-extensions:
+    DeriveFoldable
+    DeriveFunctor
+    DeriveTraversable
+    OverloadedStrings
+    TupleSections
+
+  build-depends:
+    , base
+
+  hs-source-dirs:     src
+  default-language:   Haskell2010
+
+executable haskell-template
+  import:  shared
+  main-is: Main.hs
