@@ -41,6 +41,7 @@ common shared
     , containers
     , directory
     , filepath
+    , mtl
     , parsec
 
   hs-source-dirs:     src
