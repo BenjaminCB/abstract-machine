@@ -89,4 +89,3 @@ run wstack@(While' cond body : stack) (RVLit (AST.IntLit n) : vs) ss =
 -- compcall2
 -- compcall3
 run _ _ _ = lift $ Left "Unimplemented case"
-
