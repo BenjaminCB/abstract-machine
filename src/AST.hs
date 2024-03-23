@@ -1,7 +1,5 @@
 module AST where
 
-import Data.Map qualified as M
-
 data SrcFile = SrcFile [Import] [Stmt] [Export]
     deriving (Eq, Show)
 
@@ -31,7 +29,6 @@ data Expr
 data Lit
     = IntLit Int
     | CompLit [String] [Stmt]
-    | Obj (M.Map String Lit)
     deriving (Eq, Show)
 
 data BinOp
