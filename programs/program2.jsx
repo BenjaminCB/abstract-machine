@@ -1,9 +1,4 @@
-import * as x from "module1";
-import
-    { a
-    , b
-    , c
-    } from "module2";
+import * as x from "/program4.jsx";
 
 let z = 10;
 

@@ -169,4 +169,4 @@ run stack vs ss = do
     let stringFiles = show $ M.toList files
     let stringLocals = show $ M.toList locals
     let stringExports = show $ M.toList exports
-    lift $ Left $ intercalate "\n" [show stack, show vs, show ss, stringFiles, stringLocals, stringExports]
+    lift $ Left $ intercalate "\n" ["--------------", show stack, show vs, show ss, stringFiles, stringLocals, stringExports, "------------"]
