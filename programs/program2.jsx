@@ -2,6 +2,8 @@ import * as x from "/program4.jsx";
 
 let z = 10;
 
+let y = 0;
+
 if (!= y 0) {
     z = + z 1;
 } else {
@@ -14,6 +16,6 @@ let args = <a, b>
 
 let noargs = <></>;
 
-comp c (1, 2);
+comp args (1, 2);
 
 export z;
