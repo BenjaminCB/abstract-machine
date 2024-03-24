@@ -41,6 +41,20 @@ printParseError (path, err) = do
     print err
     newlines 1
 
+prettyPrintMap :: (Show k, Show v) => M.Map k v -> IO ()
+prettyPrintMap m = do
+    mapM_ (\(k, v) -> putStrLn $ "    " ++ show k ++ ": " ++ show v) (M.toList m)
+
+prettyPrintTupleWithMap :: (Show k, Show v) => (k, M.Map k v) -> IO ()
+prettyPrintTupleWithMap (k, m) = do
+    putStrLn $ "  " ++ show k ++ ":"
+    prettyPrintMap m
+
+prettyPrintLocals :: M.Map String (M.Map String AM.RuntimeValue) -> IO ()
+prettyPrintLocals locals = do
+    putStrLn "locals:"
+    mapM_ prettyPrintTupleWithMap (M.toList locals)
+
 main :: IO ()
 main = do
     [rootDir, entryPoint] <- getArgs
@@ -62,7 +76,6 @@ main = do
                     putStrLn "Abstract Machine Error:"
                     putStrLn err
                 Right (_, (_, locals, _)) -> do
-                    putStrLn "locals:"
-                    print locals
+                    prettyPrintLocals locals
         Nothing -> do
             putStrLn "Entry point not found"
