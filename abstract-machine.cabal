@@ -35,6 +35,7 @@ common shared
   other-modules:
     AbstractMachine
     AST
+    Parser
 
   build-depends:
     , base
