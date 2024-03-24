@@ -3,7 +3,8 @@ module Main where
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
-import Data.Either (partitionEithers)
+import Data.Either (partitionEithers, either, isRight)
+import Data.List (partition)
 
 import AST qualified
 import AbstractMachine qualified as AM
@@ -30,6 +31,8 @@ main = do
     [rootDir, entryPoint] <- getArgs
     paths <- getAllFilePaths rootDir
     fileContents <- mapM readFile paths
-    let (errs, srcFiles) = partitionEithers (map parseInput fileContents)
+    let tuples = zip paths fileContents
+    let parseResults = map (fmap parseInput) tuples
+    let (errs, srcFiles) = partition (isRight . snd) parseResults
     mapM_ print errs
     mapM_ print srcFiles
