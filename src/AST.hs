@@ -4,14 +4,15 @@ data SrcFile = SrcFile [Import] [Stmt] [Export]
     deriving (Eq)
 
 instance Show SrcFile where
-    show (SrcFile imports stmts exports) = unlines
-        [ "Imports:"
-        , show imports
-        , "Statements:"
-        , show stmts
-        , "Exports:"
-        , show exports
-        ]
+    show (SrcFile imports stmts exports) =
+        unlines
+            [ "Imports:"
+            , show imports
+            , "Statements:"
+            , show stmts
+            , "Exports:"
+            , show exports
+            ]
 
 data Import
     = ImportStar String String
@@ -39,18 +40,20 @@ data Stmt
 instance Show Stmt where
     show (Let name expr) = "let " ++ name ++ " = " ++ show expr
     show (Assign name expr) = name ++ " = " ++ show expr
-    show (If cond thenStmts elseStmts) = concat
-        [ "if (" ++ show cond ++ ") {"
-        , show thenStmts
-        , "} else {"
-        , show elseStmts
-        , "}"
-        ]
-    show (While cond stmts) = concat
-        [ "while (" ++ show cond ++ ") {"
-        , show stmts
-        , "}"
-        ]
+    show (If cond thenStmts elseStmts) =
+        concat
+            [ "if (" ++ show cond ++ ") {"
+            , show thenStmts
+            , "} else {"
+            , show elseStmts
+            , "}"
+            ]
+    show (While cond stmts) =
+        concat
+            [ "while (" ++ show cond ++ ") {"
+            , show stmts
+            , "}"
+            ]
     show (CompCall expr args) = "comp " ++ show expr ++ "(" ++ unwords (map show args) ++ ")"
 
 data Expr
@@ -73,11 +76,12 @@ data Lit
 
 instance Show Lit where
     show (IntLit n) = show n
-    show (CompLit args stmts) = concat
-        [ "<" ++ unwords args ++ ">"
-        , show stmts
-        , "</>"
-        ]
+    show (CompLit args stmts) =
+        concat
+            [ "<" ++ unwords args ++ ">"
+            , show stmts
+            , "</>"
+            ]
 
 data BinOp
     = Add

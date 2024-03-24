@@ -1,9 +1,9 @@
 module Main where
 
+import Data.Map qualified as M
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
-import Data.Map qualified as M
 
 import Parser
 
@@ -25,8 +25,8 @@ getAllFilePaths dir = do
 
 partition :: [(a, Either b c)] -> ([(a, b)], [(a, c)])
 partition = foldr f ([], [])
-  where
-    f (a, e) (ls, rs) = either (\l -> ((a, l) : ls, rs)) (\r -> (ls, (a, r) : rs)) e
+    where
+        f (a, e) (ls, rs) = either (\l -> ((a, l) : ls, rs)) (\r -> (ls, (a, r) : rs)) e
 
 main :: IO ()
 main = do

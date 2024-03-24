@@ -1,8 +1,8 @@
 module AbstractMachine where
 
 import Control.Monad.State.Lazy
-import Data.Map qualified as M
 import Data.List (intercalate)
+import Data.Map qualified as M
 
 import AST qualified
 
@@ -76,7 +76,6 @@ run ::
         )
         (Either String)
         (M.Map String (M.Map String RuntimeValue))
-
 -- end configuration
 run [] _ _ = do
     (_, locals, _) <- get
@@ -110,13 +109,11 @@ run (Expr (AST.Proj ident field) : stack) vs (s : ss) = do
 -- if rules
 run (Stmt (AST.If cond t f) : stack) vs ss = run (Expr cond : Branch t f : stack) vs ss
 run (Branch t f : stack) (RVInt n : vs) ss =
-
     run (if n /= 0 then map Stmt t else map Stmt f ++ stack) vs ss
 -- while rules
 run (Stmt (AST.While cond body) : stack) vs ss = run (Expr cond : While' cond body : stack) vs ss
 run wstack@(While' _ body : stack) (RVInt n : vs) ss =
     run (if n /= 0 then map Stmt body ++ wstack else stack) vs ss
-
 -- let and assign
 run (Stmt (AST.Let ident e) : stack) vs ss = run (Expr e : Bind ident : stack) vs ss
 run (Bind ident : stack) (v : vs) (s : ss) = do
@@ -124,7 +121,6 @@ run (Bind ident : stack) (v : vs) (s : ss) = do
     put (files, localInsert s ident v locals, exports)
     run stack vs (s : ss)
 run (Stmt (AST.Assign ident e) : stack) vs ss = run (Expr e : Bind ident : stack) vs ss
-
 -- imports
 run (Import (AST.ImportStar ident f) : stack) vs ss = do
     (files, _, _) <- get
@@ -159,7 +155,6 @@ run (Export (AST.Export ident) : stack) vs (s : ss) = do
 -- literals
 run (Lit (AST.IntLit n) : stack) vs ss = run stack (RVInt n : vs) ss
 run (Lit (AST.CompLit idents body) : stack) vs (s : ss) = run stack (RVComp idents body s : vs) (s : ss)
-
 -- compcall
 run (Stmt (AST.CompCall comp args) : stack) vs ss = run (Expr comp : CompCall' args : stack) vs ss
 run (CompCall' args : stack) (RVComp idents body s : vs) ss =
