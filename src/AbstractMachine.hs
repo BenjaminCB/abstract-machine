@@ -128,7 +128,7 @@ run (Expr (AST.Proj ident field) : stack) vs (s : ss) = do
     case val of
         RVObj obj -> case M.lookup field obj of
             Just lit -> run stack (lit : vs) (s : ss)
-            Nothing -> lift $ Left $ "Field " ++ field ++ " not found in object " ++ ident
+            Nothing -> lift $ Left $ "Field " ++ field ++ " not found in object " ++ ident ++ " in scope " ++ s
         _ -> lift $ Left $ "Variable " ++ ident ++ " is not an object"
 
 -- if rules
