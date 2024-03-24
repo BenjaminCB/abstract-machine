@@ -1,7 +1,6 @@
 module AbstractMachine where
 
 import Control.Monad.State.Lazy
-import Data.List (intercalate)
 import Data.Map qualified as M
 
 import AST qualified
@@ -24,11 +23,33 @@ data RuntimeSyntax
     | PopScope
     deriving (Eq, Show)
 
+showSyntaxConstructor :: RuntimeSyntax -> String
+showSyntaxConstructor (SrcFile _) = "SrcFile"
+showSyntaxConstructor (Import _) = "Import"
+showSyntaxConstructor (Export _) = "Export"
+showSyntaxConstructor (Stmt _) = "Stmt"
+showSyntaxConstructor (Expr _) = "Expr"
+showSyntaxConstructor (BinOp _) = "BinOp"
+showSyntaxConstructor (Lit _) = "Lit"
+showSyntaxConstructor (Branch _ _) = "Branch"
+showSyntaxConstructor (While' _ _) = "While'"
+showSyntaxConstructor (CompCall' _) = "CompCall'"
+showSyntaxConstructor (Bind _) = "Bind"
+showSyntaxConstructor (BindExport _) = "BindExport"
+showSyntaxConstructor (BindExports _) = "BindExports"
+showSyntaxConstructor EmptyExports = "EmptyExports"
+showSyntaxConstructor PopScope = "PopScope"
+
 data RuntimeValue
     = RVInt Int
     | RVObj (M.Map String RuntimeValue)
     | RVComp [String] [AST.Stmt] String
     deriving (Eq, Show)
+
+showValueConstructor :: RuntimeValue -> String
+showValueConstructor (RVInt _) = "RVInt"
+showValueConstructor (RVObj _) = "RVObj"
+showValueConstructor (RVComp {}) = "RVComp"
 
 localLookup ::
     String ->
@@ -166,7 +187,28 @@ run (CompCall' args : stack) (RVComp idents body s : vs) ss =
 -- failure
 run stack vs ss = do
     (files, locals, exports) <- get
-    let stringFiles = show $ M.toList files
-    let stringLocals = show $ M.toList locals
-    let stringExports = show $ M.toList exports
-    lift $ Left $ intercalate "\n" ["--------------", show stack, show vs, show ss, stringFiles, stringLocals, stringExports, "------------"]
+    let stringFiles = show $ map fst $ M.toList files
+    let stringLocals = show $ M.toList $ M.map (M.toList . M.map showValueConstructor) locals
+    let stringExports = show $ M.toList $ M.map showValueConstructor exports
+    lift $
+        Left $
+            unlines
+                [ "Failed to pattern match the following configuration:"
+                , "AMStack: "
+                , show $ map showSyntaxConstructor stack
+                , ""
+                , "AMValues: "
+                , show $ map showValueConstructor vs
+                , ""
+                , "AMScopes: "
+                , show ss
+                , ""
+                , "AMFiles: "
+                , stringFiles
+                , ""
+                , "AMLocals: "
+                , stringLocals
+                , ""
+                , "AMExports: "
+                , stringExports
+                ]
