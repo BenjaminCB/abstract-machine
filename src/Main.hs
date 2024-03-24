@@ -4,7 +4,6 @@ import System.Directory (doesDirectoryExist, listDirectory)
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 import Data.Either (partitionEithers, either, isRight)
-import Data.List (partition)
 
 import AST qualified
 import AbstractMachine qualified as AM
@@ -26,6 +25,11 @@ getAllFilePaths dir = do
             entries
     return (concat paths)
 
+partition :: [(a, Either b c)] -> ([(a, b)], [(a, c)])
+partition = foldr f ([], [])
+  where
+    f (a, e) (ls, rs) = either (\l -> ((a, l) : ls, rs)) (\r -> (ls, (a, r) : rs)) e
+
 main :: IO ()
 main = do
     [rootDir, entryPoint] <- getArgs
@@ -33,6 +37,6 @@ main = do
     fileContents <- mapM readFile paths
     let tuples = zip paths fileContents
     let parseResults = map (fmap parseInput) tuples
-    let (errs, srcFiles) = partition (isRight . snd) parseResults
+    let (errs, srcFiles) = partition parseResults
     mapM_ print errs
     mapM_ print srcFiles
