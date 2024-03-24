@@ -178,6 +178,7 @@ run (Export (AST.Export ident) : stack) vs (s : ss) = do
     run stack vs (s : ss)
 
 -- literals
+run (Expr (AST.Lit lit) : stack) vs ss = run (Lit lit : stack) vs ss
 run (Lit (AST.IntLit n) : stack) vs ss = run stack (RVInt n : vs) ss
 run (Lit (AST.CompLit idents body) : stack) vs (s : ss) = run stack (RVComp idents body s : vs) (s : ss)
 -- compcall
