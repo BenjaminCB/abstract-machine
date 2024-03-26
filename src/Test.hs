@@ -59,7 +59,6 @@ main :: IO Counts
 main = do
     let rootDir = "./programs"
     paths <- getAllFilePaths rootDir
-    mapM_ putStrLn paths
     fileContents <- mapM readFile paths
     let tuples = zip paths fileContents
     let parseResults = map (fmap parseInput) tuples
@@ -67,6 +66,8 @@ main = do
     let amSrcFiles = map (first $ drop (length rootDir)) srcFiles
     let fileGetter = M.fromList amSrcFiles
     let programsTests = findMatchingFst amSrcFiles programResults
+    putStrLn "Testing programs"
+    mapM_ (print . (\(a,_,_) -> a)) programsTests
     runTestTT $
         TestList $
             map
