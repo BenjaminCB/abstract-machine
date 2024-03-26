@@ -86,6 +86,14 @@ fileLookup f files = case M.lookup f files of
     Just src -> Right src
     Nothing -> Left $ "File " ++ f ++ " not found"
 
+runFile ::
+    String ->
+    AST.SrcFile ->
+    M.Map String AST.SrcFile ->
+    Either String (M.Map String (M.Map String RuntimeValue))
+runFile entryPoint src fileGetter =
+    evalStateT (run [SrcFile src] [] [entryPoint]) (fileGetter, M.empty, M.empty)
+
 run ::
     [RuntimeSyntax] ->
     [RuntimeValue] ->

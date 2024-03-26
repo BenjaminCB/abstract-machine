@@ -36,6 +36,7 @@ common shared
     AbstractMachine
     AST
     Parser
+    Auxiliary
 
   build-depends:
     , base
