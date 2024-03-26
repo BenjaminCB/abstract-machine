@@ -113,7 +113,6 @@ run [] _ _ = do
 -- srcfile
 run (SrcFile (AST.SrcFile imports stmts exports) : stack) vs ss =
     run (map Import imports ++ map Stmt stmts ++ map Export exports ++ stack) vs ss
-
 -- binoperations
 run (Expr (AST.BO bo e1 e2) : stack) vs ss = run (Expr e1 : Expr e2 : BinOp bo : stack) vs ss
 run (BinOp bo : stack) (RVInt n2 : RVInt n1 : vs) ss =

@@ -6,8 +6,8 @@ import System.Environment (getArgs)
 import Text.Parsec (ParseError)
 
 import AbstractMachine qualified as AM
-import Parser
 import Auxiliary
+import Parser
 
 newlines :: Int -> IO ()
 newlines = putStr . concat . flip replicate "\n"

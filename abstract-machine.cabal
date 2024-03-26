@@ -35,14 +35,15 @@ common shared
   other-modules:
     AbstractMachine
     AST
-    Parser
     Auxiliary
+    Parser
 
   build-depends:
     , base
     , containers
     , directory
     , filepath
+    , HUnit
     , mtl
     , parsec
 
@@ -52,3 +53,7 @@ common shared
 executable abstract-machine
   import:  shared
   main-is: Main.hs
+
+executable abstract-machine-test
+  import:  shared
+  main-is: Test.hs

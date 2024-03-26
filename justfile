@@ -15,11 +15,11 @@ fmt:
     treefmt
 
 build:
-    cabal build
+    cabal build abstract-machine
 
 # Run ghcid -- auto-recompile and run `main` function
-watch:
-    ghcid -c "cabal repl exe:abstract-machine" --warnings -T :main
+test:
+    ghcid -c "cabal repl exe:abstract-machine-test" --warnings -T :main
 
 run *ARGS: build
     cabal run abstract-machine {{ARGS}}
