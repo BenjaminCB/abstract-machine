@@ -103,12 +103,20 @@ main = do
     fileContents <- mapM readFile paths
     let tuples = zip paths fileContents
     let parseResults = map (fmap parseInput) tuples
-    let (_, srcFiles) = partition parseResults
+    let (errs, srcFiles) = partition parseResults
+    if not (null errs)
+    then do
+        putStrLn "Errors in parsing"
+        mapM_ print errs
+        putStrLn ""
+    else
+        putStrLn "All files parsed successfully"
     let amSrcFiles = map (first $ drop (length rootDir)) srcFiles
     let fileGetter = M.fromList amSrcFiles
     let programsTests = findMatchingFst amSrcFiles programResults
     putStrLn "Testing programs"
     mapM_ (print . (\(a,_,_) -> a)) programsTests
+    putStrLn ""
     runTestTT $
         TestList $
             map
