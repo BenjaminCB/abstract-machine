@@ -36,9 +36,50 @@ program2Res =
             )
         ]
     )
+program8Res :: (FilePath, M.Map String (M.Map String AM.RuntimeValue))
+program8Res = 
+    ( "/nested_imports/program8.jsx"
+    , M.fromList [
+        ("/nested_imports/program6.jsx"
+            , M.fromList
+                [
+                    ("a", AM.RVInt 2),
+                    ("b", AM.RVInt 3)
+                ]
+            )
+        ,   ("/nested_imports/program7.jsx"
+            , M.fromList
+                [
+                    ("c", AM.RVObj (M.fromList [("a", AM.RVInt 2), ("b", AM.RVInt 3)])),
+                    ("d", AM.RVInt 2)
+                ]
+            )
+        ,   ("/nested_imports/program8.jsx"
+            , M.fromList
+                [
+                    ("a", AM.RVInt 2),
+                    ("c", AM.RVObj (M.fromList [("a", AM.RVInt 2), ("b", AM.RVInt 3)])),
+                    ("x", AM.RVObj (M.fromList [(
+                        "c", 
+                        AM.RVObj (M.fromList [("a", AM.RVInt 2), ("b", AM.RVInt 3)])
+                    ), ("d", AM.RVInt 2)]))
+                ]
+            )
+    ])
+
+program9Res :: (FilePath, M.Map String (M.Map String AM.RuntimeValue))
+program9Res = ( "/alpha/program9.jsx"
+    , M.fromList [
+        ("/alpha/program9.jsx", M.fromList
+            [
+                ("z", AM.RVInt 42),
+                ("y", AM.RVInt 0)
+            ]
+        )
+    ])
 
 programResults :: [(FilePath, M.Map String (M.Map String AM.RuntimeValue))]
-programResults = [program2Res]
+programResults = [program2Res, program8Res,program9Res]
 
 testProgram ::
     M.Map String AST.SrcFile ->
@@ -68,6 +109,8 @@ main = do
     let programsTests = findMatchingFst amSrcFiles programResults
     putStrLn "Testing programs"
     mapM_ (print . (\(a,_,_) -> a)) programsTests
+    print amSrcFiles
+    print programResults
     runTestTT $
         TestList $
             map
