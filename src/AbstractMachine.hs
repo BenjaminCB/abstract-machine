@@ -144,8 +144,8 @@ run (Branch t f : stack) (RVInt n : vs) ss =
     run (if n /= 0 then map Stmt t else map Stmt f ++ stack) vs ss
 -- while rules
 run (Stmt (AST.While cond body) : stack) vs ss = run (Expr cond : While' cond body : stack) vs ss
-run wstack@(While' _ body : stack) (RVInt n : vs) ss =
-    run (if n /= 0 then map Stmt body ++ wstack else stack) vs ss
+run wstack@(While' cond body : stack) (RVInt n : vs) ss =
+    run (if n /= 0 then map Stmt body ++ [Expr cond] ++ wstack else stack) vs ss
 -- let and assign
 run (Stmt (AST.Let ident e) : stack) vs ss = run (Expr e : Bind ident : stack) vs ss
 run (Bind ident : stack) (v : vs) (s : ss) = do
