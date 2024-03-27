@@ -1,6 +1,6 @@
 let z = 0;
 
-let button <>
+let button = <>
     let y = z;
 </>;
 

@@ -37,7 +37,7 @@ program2Res =
         ]
     )
 program8Res :: (FilePath, M.Map String (M.Map String AM.RuntimeValue))
-program8Res = 
+program8Res =
     ( "/nested_imports/program8.jsx"
     , M.fromList [
         ("/nested_imports/program6.jsx"
@@ -60,7 +60,7 @@ program8Res =
                     ("a", AM.RVInt 2),
                     ("c", AM.RVObj (M.fromList [("a", AM.RVInt 2), ("b", AM.RVInt 3)])),
                     ("x", AM.RVObj (M.fromList [(
-                        "c", 
+                        "c",
                         AM.RVObj (M.fromList [("a", AM.RVInt 2), ("b", AM.RVInt 3)])
                     ), ("d", AM.RVInt 2)]))
                 ]
@@ -109,8 +109,6 @@ main = do
     let programsTests = findMatchingFst amSrcFiles programResults
     putStrLn "Testing programs"
     mapM_ (print . (\(a,_,_) -> a)) programsTests
-    print amSrcFiles
-    print programResults
     runTestTT $
         TestList $
             map
