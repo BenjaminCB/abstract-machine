@@ -40,10 +40,12 @@ main = do
     let tuples = zip paths fileContents
     let parseResults = map (fmap parseInput) tuples
     let (errs, srcFiles) = partition parseResults
-    newlines 3
-    putStrLn "Parse Errors:"
-    mapM_ printParseError errs
-    newlines 3
+    if null errs
+        then putStrLn "No parse errors"
+        else do
+            putStrLn "Parse Errors:"
+            mapM_ printParseError errs
+            newlines 3
     let fileGetter = M.fromList (map (first $ drop (length rootDir)) srcFiles)
     case M.lookup entryPoint fileGetter of
         Just src -> do
