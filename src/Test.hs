@@ -36,6 +36,7 @@ program2Res =
             )
         ]
     )
+-- Should succede (Accesse nested projection)
 program8Res :: (FilePath, M.Map String (M.Map String AM.RuntimeValue))
 program8Res =
     ( "/nested_imports/program8.jsx"
@@ -66,13 +67,14 @@ program8Res =
                 ]
             )
     ])
-
+-- Expected to fail until alpha conversion is added (z is modified after component declaration)
 program9Res :: (FilePath, M.Map String (M.Map String AM.RuntimeValue))
 program9Res = ( "/alpha/program9.jsx"
     , M.fromList [
         ("/alpha/program9.jsx", M.fromList
             [
                 ("z", AM.RVInt 42),
+                ("button", AM.RVComp [] [AST.Let "y" (AST.Var "z")] "/alpha/program9.jsx"),
                 ("y", AM.RVInt 0)
             ]
         )

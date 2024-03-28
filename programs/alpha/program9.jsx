@@ -5,3 +5,5 @@ let button = <>
 </>;
 
 z = 42;
+
+comp button();
