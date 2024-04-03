@@ -90,7 +90,12 @@ runFile ::
     M.Map String AST.SrcFile ->
     Either String (M.Map (String, String) RuntimeValue)
 runFile entryPoint src fileGetter =
-    evalStateT (run [SrcFile src] [] [entryPoint]) (fileGetter, M.empty, M.empty)
+    evalStateT (run [SrcFile src] [] [entryPoint]) (fileGetter, M.empty, M.empty, "")
+
+updateTrace :: String -> StateT (a, b, c, String) (Either d) ()
+updateTrace s = do
+    (files, locals, exports, trace) <- get
+    put (files, locals, exports, trace ++ s)
 
 run ::
     [RuntimeSyntax] ->
@@ -100,12 +105,13 @@ run ::
         ( M.Map String AST.SrcFile
         , M.Map (String, String) RuntimeValue
         , M.Map String RuntimeValue
+        , String
         )
         (Either String)
         (M.Map (String, String) RuntimeValue)
 -- end configuration
 run [] _ _ = do
-    (_, locals, _) <- get
+    (_, locals, _, _) <- get
     return locals
 
 -- srcfile
@@ -122,13 +128,13 @@ run (BinOp bo : stack) (RVInt n2 : RVInt n1 : vs) ss =
 
 -- var
 run (Expr (AST.Var v) : stack) vs (s : ss) = do
-    (_, locals, _) <- get
+    (_, locals, _, _) <- get
     val <- lift $ localLookup s v locals
     run stack (val : vs) (s : ss)
 
 -- proj
 run (Expr (AST.Proj ident field) : stack) vs (s : ss) = do
-    (_, locals, _) <- get
+    (_, locals, _, _) <- get
     val <- lift $ localLookup s ident locals
     case val of
         RVObj obj -> case M.lookup field obj of
@@ -147,39 +153,39 @@ run wstack@(While' cond body : stack) (RVInt n : vs) ss =
 -- let and assign
 run (Stmt (AST.Let ident e) : stack) vs ss = run (Expr e : Bind ident : stack) vs ss
 run (Bind ident : stack) (v : vs) (s : ss) = do
-    (files, locals, exports) <- get
-    put (files, localInsert s ident v locals, exports)
+    (files, locals, exports, trace) <- get
+    put (files, localInsert s ident v locals, exports, trace)
     run stack vs (s : ss)
 run (Stmt (AST.Assign ident e) : stack) vs ss = run (Expr e : Bind ident : stack) vs ss
 -- imports
 run (Import (AST.ImportStar ident f) : stack) vs ss = do
-    (files, _, _) <- get
+    (files, _, _, _) <- get
     src <- lift $ fileLookup f files
     run (SrcFile src : PopScope : BindExports ident : EmptyExports : stack) vs (f : ss)
 run (Import (AST.ImportList idents f) : stack) vs ss = do
-    (files, _, _) <- get
+    (files, _, _, _) <- get
     src <- lift $ fileLookup f files
     run (SrcFile src : PopScope : map BindExport idents ++ EmptyExports : stack) vs (f : ss)
 run (PopScope : stack) vs (_ : ss) = run stack vs ss
 run (EmptyExports : stack) vs ss = do
-    (files, locals, _) <- get
-    put (files, locals, M.empty)
+    (files, locals, _, trace) <- get
+    put (files, locals, M.empty, trace)
     run stack vs ss
 run (BindExports ident : stack) vs (s : ss) = do
-    (files, locals, exports) <- get
-    put (files, localInsert s ident (RVObj exports) locals, exports)
+    (files, locals, exports, trace) <- get
+    put (files, localInsert s ident (RVObj exports) locals, exports, trace)
     run stack vs (s : ss)
 run (BindExport ident : stack) vs (s : ss) = do
-    (files, locals, exports) <- get
+    (files, locals, exports, trace) <- get
     val <- lift $ exportLookup ident exports
-    put (files, localInsert s ident val locals, exports)
+    put (files, localInsert s ident val locals, exports, trace)
     run stack vs (s : ss)
 
 -- export
 run (Export (AST.Export ident) : stack) vs (s : ss) = do
-    (files, locals, exports) <- get
+    (files, locals, exports, trace) <- get
     val <- lift $ localLookup s ident locals
-    put (files, locals, M.insert ident val exports)
+    put (files, locals, M.insert ident val exports, trace)
     run stack vs (s : ss)
 
 -- literals
@@ -196,7 +202,7 @@ run (CompCall' args : stack) (RVComp idents body s : vs) ss =
 
 -- failure
 run stack vs ss = do
-    (files, locals, exports) <- get
+    (files, locals, exports, _) <- get
     let stringFiles = show $ map fst $ M.toList files
     let stringLocals = show $ M.toList $ M.map showValueConstructor locals
     let stringExports = show $ M.toList $ M.map showValueConstructor exports
