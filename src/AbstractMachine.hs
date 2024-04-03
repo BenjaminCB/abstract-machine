@@ -61,8 +61,8 @@ traceToTypst = unlines . map lineToTypst . takeUntilFirstRight
     where
         lineToTypst (Left (st, rule)) = amStateToTypst st ++ " " ++ ruleToTypst rule ++ "\\"
         lineToTypst (Right st) = amStateToTypst st
-        amStateToTypst (AMState stack _ _ _ _ _) = unwords $ map showSyntaxConstructor stack
-        ruleToTypst _ = "=>"
+        amStateToTypst (AMState stack _ _ _ _ _) = "[" ++ unwords (map showSyntaxConstructor stack) ++ "]"
+        ruleToTypst r = "attach(limits(=>),t:" ++ r ++ ")"
 
 showValueConstructor :: RuntimeValue -> String
 showValueConstructor (RVInt _) = "RVInt"
