@@ -46,6 +46,24 @@ data RuntimeValue
     | RVComp [String] [AST.Stmt] String
     deriving (Eq, Show)
 
+data AMState = AMState [RuntimeSyntax] (M.Map String AST.SrcFile) (M.Map (String, String) RuntimeValue) (M.Map String RuntimeValue) [RuntimeValue] [String]
+    deriving (Eq, Show)
+
+type Trace = [Either (AMState, String) AMState]
+
+takeUntilFirstRight :: [Either a b] -> [Either a b]
+takeUntilFirstRight [] = []
+takeUntilFirstRight (Right x : _) = [Right x]
+takeUntilFirstRight (Left x : xs) = Left x : takeUntilFirstRight xs
+
+traceToTypst :: Trace -> String
+traceToTypst = unlines . map lineToTypst . takeUntilFirstRight
+    where
+        lineToTypst (Left (st, rule)) = amStateToTypst st ++ " " ++ ruleToTypst rule ++ "\\"
+        lineToTypst (Right st) = amStateToTypst st
+        amStateToTypst (AMState stack _ _ _ _ _) = unwords $ map showSyntaxConstructor stack
+        ruleToTypst _ = "=>"
+
 showValueConstructor :: RuntimeValue -> String
 showValueConstructor (RVInt _) = "RVInt"
 showValueConstructor (RVObj _) = "RVObj"
@@ -90,117 +108,134 @@ runFile ::
     M.Map String AST.SrcFile ->
     Either String (M.Map (String, String) RuntimeValue)
 runFile entryPoint src fileGetter =
-    evalStateT (run [SrcFile src] [] [entryPoint]) (fileGetter, M.empty, M.empty, "")
+    evalStateT (run (AMState [SrcFile src] fileGetter M.empty M.empty [] [entryPoint])) []
 
-updateTrace :: String -> StateT (a, b, c, String) (Either d) ()
-updateTrace s = do
-    (files, locals, exports, trace) <- get
-    put (files, locals, exports, trace ++ s)
+runFileWithState ::
+    String ->
+    AST.SrcFile ->
+    M.Map String AST.SrcFile ->
+    Either String (M.Map (String, String) RuntimeValue, Trace)
+runFileWithState entryPoint src fileGetter =
+    runStateT (run (AMState [SrcFile src] fileGetter M.empty M.empty [] [entryPoint])) []
 
-run ::
-    [RuntimeSyntax] ->
-    [RuntimeValue] ->
-    [String] ->
-    StateT
-        ( M.Map String AST.SrcFile
-        , M.Map (String, String) RuntimeValue
-        , M.Map String RuntimeValue
-        , String
-        )
-        (Either String)
-        (M.Map (String, String) RuntimeValue)
+run :: AMState -> StateT Trace (Either String) (M.Map (String, String) RuntimeValue)
 -- end configuration
-run [] _ _ = do
-    (_, locals, _, _) <- get
+run st@(AMState [] _ locals _ _ _) = do
+    modify (++[Right st])
     return locals
 
 -- srcfile
-run (SrcFile (AST.SrcFile imports stmts exports) : stack) vs ss =
-    run (map Import imports ++ map Stmt stmts ++ map Export exports ++ stack) vs ss
+run st@(AMState (SrcFile (AST.SrcFile imports stmts exports) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"SrcFile")])
+    run (AMState (map Import imports ++ map Stmt stmts ++ map Export exports ++ stack) fg ls es vs ss)
+
 -- binoperations
-run (Expr (AST.BO bo e1 e2) : stack) vs ss = run (Expr e1 : Expr e2 : BinOp bo : stack) vs ss
-run (BinOp bo : stack) (RVInt n2 : RVInt n1 : vs) ss =
-    run stack (RVInt (op bo) : vs) ss
+run st@(AMState (Expr (AST.BO bo e1 e2) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Expr")])
+    run (AMState (Expr e1 : Expr e2 : BinOp bo : stack) fg ls es vs ss)
+run st@(AMState (BinOp bo : stack) fg ls es (RVInt n2 : RVInt n1 : vs) ss) = do
+    modify (++[Left(st ,"BinOp")])
+    run (AMState stack fg ls es (RVInt (op bo) : vs) ss)
     where
         op AST.Add = n1 + n2
         op AST.Sub = n1 - n2
         op AST.NotEq = if n1 /= n2 then 1 else 0
 
 -- var
-run (Expr (AST.Var v) : stack) vs (s : ss) = do
-    (_, locals, _, _) <- get
-    val <- lift $ localLookup s v locals
-    run stack (val : vs) (s : ss)
+run st@(AMState (Expr (AST.Var v) : stack) fg ls es vs (s : ss)) = do
+    modify (++[Left(st ,"Expr")])
+    val <- lift $ localLookup s v ls
+    run (AMState stack fg ls es (val : vs) (s : ss))
 
 -- proj
-run (Expr (AST.Proj ident field) : stack) vs (s : ss) = do
-    (_, locals, _, _) <- get
-    val <- lift $ localLookup s ident locals
+run st@(AMState (Expr (AST.Proj ident field) : stack) fg ls es vs (s : ss)) = do
+    modify (++[Left(st ,"Expr")])
+    val <- lift $ localLookup s ident ls
     case val of
         RVObj obj -> case M.lookup field obj of
-            Just lit -> run stack (lit : vs) (s : ss)
+            Just lit -> run (AMState stack fg ls es (lit : vs) (s : ss))
             Nothing -> lift $ Left $ "Field " ++ field ++ " not found in object " ++ ident ++ " in scope " ++ s
         _ -> lift $ Left $ "Variable " ++ ident ++ " is not an object"
 
 -- if rules
-run (Stmt (AST.If cond t f) : stack) vs ss = run (Expr cond : Branch t f : stack) vs ss
-run (Branch t f : stack) (RVInt n : vs) ss =
-    run (if n /= 0 then map Stmt t else map Stmt f ++ stack) vs ss
+run st@(AMState (Stmt (AST.If cond t f) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Stmt")])
+    run (AMState (Expr cond : Branch t f : stack) fg ls es vs ss)
+run st@(AMState (Branch t f : stack) fg ls es (RVInt n : vs) ss) = do
+    modify (++[Left(st ,"Branch")])
+    run (AMState (if n /= 0 then map Stmt t else map Stmt f ++ stack) fg ls es vs ss)
+
 -- while rules
-run (Stmt (AST.While cond body) : stack) vs ss = run (Expr cond : While' cond body : stack) vs ss
-run wstack@(While' cond body : stack) (RVInt n : vs) ss =
-    run (if n /= 0 then map Stmt body ++ [Expr cond] ++ wstack else stack) vs ss
+run st@(AMState (Stmt (AST.While cond body) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Stmt")])
+    run (AMState (Expr cond : While' cond body : stack) fg ls es vs ss)
+run st@(AMState wstack@(While' cond body : stack) fg ls es (RVInt n : vs) ss) = do
+    modify (++[Left(st ,"While'")])
+    run (AMState (if n /= 0 then map Stmt body ++ [Expr cond] ++ wstack else stack) fg ls es vs ss)
+
 -- let and assign
-run (Stmt (AST.Let ident e) : stack) vs ss = run (Expr e : Bind ident : stack) vs ss
-run (Bind ident : stack) (v : vs) (s : ss) = do
-    (files, locals, exports, trace) <- get
-    put (files, localInsert s ident v locals, exports, trace)
-    run stack vs (s : ss)
-run (Stmt (AST.Assign ident e) : stack) vs ss = run (Expr e : Bind ident : stack) vs ss
+run st@(AMState (Stmt (AST.Let ident e) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Stmt")])
+    run (AMState (Expr e : Bind ident : stack) fg ls es vs ss)
+run st@(AMState (Bind ident : stack) fg ls es (v : vs) (s : ss)) = do
+    modify (++[Left(st ,"Bind")])
+    run (AMState stack fg (localInsert s ident v ls) es vs (s : ss))
+run st@(AMState (Stmt (AST.Assign ident e) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Stmt")])
+    run (AMState (Expr e : Bind ident : stack) fg ls es vs ss)
+
 -- imports
-run (Import (AST.ImportStar ident f) : stack) vs ss = do
-    (files, _, _, _) <- get
-    src <- lift $ fileLookup f files
-    run (SrcFile src : PopScope : BindExports ident : EmptyExports : stack) vs (f : ss)
-run (Import (AST.ImportList idents f) : stack) vs ss = do
-    (files, _, _, _) <- get
-    src <- lift $ fileLookup f files
-    run (SrcFile src : PopScope : map BindExport idents ++ EmptyExports : stack) vs (f : ss)
-run (PopScope : stack) vs (_ : ss) = run stack vs ss
-run (EmptyExports : stack) vs ss = do
-    (files, locals, _, trace) <- get
-    put (files, locals, M.empty, trace)
-    run stack vs ss
-run (BindExports ident : stack) vs (s : ss) = do
-    (files, locals, exports, trace) <- get
-    put (files, localInsert s ident (RVObj exports) locals, exports, trace)
-    run stack vs (s : ss)
-run (BindExport ident : stack) vs (s : ss) = do
-    (files, locals, exports, trace) <- get
-    val <- lift $ exportLookup ident exports
-    put (files, localInsert s ident val locals, exports, trace)
-    run stack vs (s : ss)
+run st@(AMState (Import (AST.ImportStar ident f) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Import")])
+    src <- lift $ fileLookup f fg
+    run (AMState (SrcFile src : PopScope : BindExports ident : EmptyExports : stack) fg ls es vs (f : ss))
+run st@(AMState (Import (AST.ImportList idents f) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Import")])
+    src <- lift $ fileLookup f fg
+    run (AMState (SrcFile src : PopScope : map BindExport idents ++ EmptyExports : stack) fg ls es vs (f : ss))
+run st@(AMState (PopScope : stack) fg ls es vs (_ : ss)) = do
+    modify (++[Left(st ,"PopScope")])
+    run (AMState stack fg ls es vs ss)
+run st@(AMState (EmptyExports : stack) fg ls _ vs ss) = do
+    modify (++[Left(st ,"EmptyExports")])
+    run (AMState stack fg ls M.empty vs ss)
+run st@(AMState (BindExports ident : stack) fg ls es vs (s : ss)) = do
+    modify (++[Left(st ,"BindExports")])
+    run (AMState stack fg (localInsert s ident (RVObj es) ls) es vs (s : ss))
+run st@(AMState (BindExport ident : stack) fg ls es vs (s : ss)) = do
+    modify (++[Left(st ,"BindExport")])
+    val <- lift $ exportLookup ident es
+    run (AMState stack fg (localInsert s ident val ls) es vs (s : ss))
 
 -- export
-run (Export (AST.Export ident) : stack) vs (s : ss) = do
-    (files, locals, exports, trace) <- get
-    val <- lift $ localLookup s ident locals
-    put (files, locals, M.insert ident val exports, trace)
-    run stack vs (s : ss)
+run st@(AMState (Export (AST.Export ident) : stack) fg ls es vs (s : ss)) = do
+    modify (++[Left(st ,"Export")])
+    val <- lift $ localLookup s ident ls
+    run (AMState stack fg ls (M.insert ident val es) vs (s : ss))
 
 -- literals
-run (Expr (AST.Lit lit) : stack) vs ss = run (Lit lit : stack) vs ss
-run (Lit (AST.IntLit n) : stack) vs ss = run stack (RVInt n : vs) ss
-run (Lit (AST.CompLit idents body) : stack) vs (s : ss) = run stack (RVComp idents body s : vs) (s : ss)
+run st@(AMState (Expr (AST.Lit lit) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Expr")])
+    run (AMState (Lit lit : stack) fg ls es vs ss)
+run st@(AMState (Lit (AST.IntLit n) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Lit")])
+    run (AMState stack fg ls es (RVInt n : vs) ss)
+run st@(AMState (Lit (AST.CompLit idents body) : stack) fg ls es vs (s : ss)) = do
+    modify (++[Left(st ,"Lit")])
+    run (AMState stack fg ls es (RVComp idents body s : vs) (s : ss))
+
 -- compcall
-run (Stmt (AST.CompCall comp args) : stack) vs ss = run (Expr comp : CompCall' args : stack) vs ss
-run (CompCall' args : stack) (RVComp idents body s : vs) ss =
-    run (lets ++ stmts ++ [PopScope] ++ stack) vs (s : ss)
+run st@(AMState (Stmt (AST.CompCall comp args) : stack) fg ls es vs ss) = do
+    modify (++[Left(st ,"Stmt")])
+    run (AMState (Expr comp : CompCall' args : stack) fg ls es vs ss)
+run st@(AMState (CompCall' args : stack) fg ls es (RVComp idents body s : vs) ss) = do
+    modify (++[Left(st ,"CompCall'")])
+    run (AMState (lets ++ stmts ++ [PopScope] ++ stack) fg ls es vs (s : ss))
     where
         lets = zipWith (\i a -> Stmt (AST.Let i a)) idents args
         stmts = map Stmt body
 
 -- failure
-run _ _ _ = do
-    (_, _, _, trace) <- get
-    lift $ Left trace
+run (AMState {}) = do
+    trace <- get
+    lift $ Left $ "Failure: " ++ show trace

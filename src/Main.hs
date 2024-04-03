@@ -44,12 +44,14 @@ main = do
     let fileGetter = M.fromList (map (first $ drop (length rootDir)) srcFiles)
     case M.lookup entryPoint fileGetter of
         Just src -> do
-            let amResult = AM.runFile entryPoint src fileGetter
+            let amResult = AM.runFileWithState entryPoint src fileGetter
             case amResult of
                 Left err -> do
                     putStrLn "Abstract Machine Error:"
                     putStrLn err
-                Right locals -> do
+                Right (locals, trace) -> do
                     prettyPrintLocals locals
+                    putStrLn "trace:"
+                    putStrLn $ AM.traceToTypst trace
         Nothing -> do
             putStrLn "Entry point not found"
