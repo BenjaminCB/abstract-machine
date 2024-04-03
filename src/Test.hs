@@ -9,42 +9,31 @@ import AbstractMachine qualified as AM
 import Auxiliary
 import Parser
 
-program2Res :: (FilePath, M.Map String (M.Map String AM.RuntimeValue))
-program2Res =
-    ( "/program2.jsx"
-    , M.fromList
-        [
-            ( "/program2.jsx"
-            , M.fromList
-                [ ("a", AM.RVInt 1)
-                , ("args", AM.RVComp ["a", "b"] [AST.Let "compvar" (AST.BO AST.Add (AST.Var "a") (AST.Var "b"))] "/program2.jsx")
-                , ("b", AM.RVInt 2)
-                , ("compvar", AM.RVInt 3)
-                , ("noargs", AM.RVComp [] [] "/program2.jsx")
-                , ("x", AM.RVObj (M.fromList [("a", AM.RVInt 1), ("b", AM.RVInt 2), ("c", AM.RVInt 3)]))
-                , ("y", AM.RVInt 0)
-                , ("z", AM.RVInt 9)
-                ]
-            )
-        ,
-            ( "/program4.jsx"
-            , M.fromList
-                [ ("a", AM.RVInt 1)
-                , ("b", AM.RVInt 2)
-                , ("c", AM.RVInt 3)
-                ]
-            )
-        ]
-    )
+program2Res :: (FilePath, M.Map (String, String) AM.RuntimeValue)
+program2Res = ("/program2.jsx", M.fromList xs)
+    where
+        xs = [ (("/program2.jsx", "a"), AM.RVInt 1)
+             , (("/program2.jsx", "args"), AM.RVComp ["a", "b"] [AST.Let "compvar" (AST.BO AST.Add (AST.Var "a") (AST.Var "b"))] "/program2.jsx")
+             , (("/program2.jsx", "b"), AM.RVInt 2)
+             , (("/program2.jsx", "compvar"), AM.RVInt 3)
+             , (("/program2.jsx", "noargs"), AM.RVComp [] [] "/program2.jsx")
+             , (("/program2.jsx", "x"), AM.RVObj (M.fromList [("a", AM.RVInt 1), ("b", AM.RVInt 2), ("c", AM.RVInt 3)]))
+             , (("/program2.jsx", "y"), AM.RVInt 0)
+             , (("/program2.jsx", "z"), AM.RVInt 9)
+             , (("/program4.jsx", "a"), AM.RVInt 1)
+             , (("/program4.jsx", "b"), AM.RVInt 2)
+             , (("/program4.jsx", "c"), AM.RVInt 3)
+             ]
 
-programResults :: [(FilePath, M.Map String (M.Map String AM.RuntimeValue))]
+
+programResults :: [(FilePath, M.Map (String, String) AM.RuntimeValue)]
 programResults = [program2Res]
 
 testProgram ::
     M.Map String AST.SrcFile ->
     String ->
     AST.SrcFile ->
-    M.Map String (M.Map String AM.RuntimeValue) ->
+    M.Map (String, String) AM.RuntimeValue ->
     Test
 testProgram fileGetter entryPoint file expected =
     entryPoint ~: Right expected ~=? AM.runFile entryPoint file fileGetter

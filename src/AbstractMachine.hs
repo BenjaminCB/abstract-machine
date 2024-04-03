@@ -54,21 +54,19 @@ showValueConstructor (RVComp {}) = "RVComp"
 localLookup ::
     String ->
     String ->
-    M.Map String (M.Map String RuntimeValue) ->
+    M.Map (String, String) RuntimeValue ->
     Either String RuntimeValue
-localLookup scope ident env = case M.lookup scope env of
-    Just m -> case M.lookup ident m of
-        Just val -> Right val
-        Nothing -> Left $ "Variable " ++ ident ++ " not found in scope " ++ scope
-    Nothing -> Left $ "Scope " ++ scope ++ " not found"
+localLookup scope ident env = case M.lookup (scope, ident) env of
+    Just val -> Right val
+    Nothing -> Left $ "Variable " ++ ident ++ " not found in scope " ++ scope
 
 localInsert ::
     String ->
     String ->
     RuntimeValue ->
-    M.Map String (M.Map String RuntimeValue) ->
-    M.Map String (M.Map String RuntimeValue)
-localInsert scope ident value = M.insertWith M.union scope (M.singleton ident value)
+    M.Map (String, String) RuntimeValue ->
+    M.Map (String, String) RuntimeValue
+localInsert scope ident = M.insert (scope, ident)
 
 exportLookup ::
     String ->
@@ -90,7 +88,7 @@ runFile ::
     String ->
     AST.SrcFile ->
     M.Map String AST.SrcFile ->
-    Either String (M.Map String (M.Map String RuntimeValue))
+    Either String (M.Map (String, String) RuntimeValue)
 runFile entryPoint src fileGetter =
     evalStateT (run [SrcFile src] [] [entryPoint]) (fileGetter, M.empty, M.empty)
 
@@ -100,11 +98,11 @@ run ::
     [String] ->
     StateT
         ( M.Map String AST.SrcFile
-        , M.Map String (M.Map String RuntimeValue)
+        , M.Map (String, String) RuntimeValue
         , M.Map String RuntimeValue
         )
         (Either String)
-        (M.Map String (M.Map String RuntimeValue))
+        (M.Map (String, String) RuntimeValue)
 -- end configuration
 run [] _ _ = do
     (_, locals, _) <- get
@@ -200,7 +198,7 @@ run (CompCall' args : stack) (RVComp idents body s : vs) ss =
 run stack vs ss = do
     (files, locals, exports) <- get
     let stringFiles = show $ map fst $ M.toList files
-    let stringLocals = show $ M.toList $ M.map (M.toList . M.map showValueConstructor) locals
+    let stringLocals = show $ M.toList $ M.map showValueConstructor locals
     let stringExports = show $ M.toList $ M.map showValueConstructor exports
     lift $
         Left $
