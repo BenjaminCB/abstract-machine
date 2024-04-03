@@ -201,30 +201,6 @@ run (CompCall' args : stack) (RVComp idents body s : vs) ss =
         stmts = map Stmt body
 
 -- failure
-run stack vs ss = do
-    (files, locals, exports, _) <- get
-    let stringFiles = show $ map fst $ M.toList files
-    let stringLocals = show $ M.toList $ M.map showValueConstructor locals
-    let stringExports = show $ M.toList $ M.map showValueConstructor exports
-    lift $
-        Left $
-            unlines
-                [ "Failed to pattern match the following configuration:"
-                , "AMStack: "
-                , show $ map showSyntaxConstructor stack
-                , ""
-                , "AMValues: "
-                , show $ map showValueConstructor vs
-                , ""
-                , "AMScopes: "
-                , show ss
-                , ""
-                , "AMFiles: "
-                , stringFiles
-                , ""
-                , "AMLocals: "
-                , stringLocals
-                , ""
-                , "AMExports: "
-                , stringExports
-                ]
+run _ _ _ = do
+    (_, _, _, trace) <- get
+    lift $ Left trace
