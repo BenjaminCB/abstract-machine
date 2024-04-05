@@ -2,6 +2,7 @@ module AbstractMachine where
 
 import Control.Monad.State.Lazy
 import Data.Map qualified as M
+import Data.List (intercalate)
 
 import AST qualified
 
@@ -51,18 +52,36 @@ data AMState = AMState [RuntimeSyntax] (M.Map String AST.SrcFile) (M.Map (String
 
 type Trace = [Either (AMState, String) AMState]
 
-takeUntilFirstRight :: [Either a b] -> [Either a b]
-takeUntilFirstRight [] = []
-takeUntilFirstRight (Right x : _) = [Right x]
-takeUntilFirstRight (Left x : xs) = Left x : takeUntilFirstRight xs
+traceToTuple :: Trace -> (AMState, [String], AMState)
+traceToTuple [] = error "Empty trace"
+traceToTuple (Right st : _) = (st, [], st)
+traceToTuple (Left (st, rule) : xs) = traceToTuple' (st, [rule], st) xs
+    where
+        traceToTuple' t [] = t
+        traceToTuple' (start, rules, _) (Right end : _) = (start, rules, end)
+        traceToTuple' (start, rules, _) (Left (end, rule') : xs') = traceToTuple' (start, rules ++ [rule'], end) xs'
+
+runtimeValueToTypst :: RuntimeValue -> String
+runtimeValueToTypst (RVInt n) = show n
+runtimeValueToTypst (RVObj obj) = concat
+    [ "{ ", intercalate ", " (map (\(k, v) -> "\"" ++ k ++ "\": " ++ runtimeValueToTypst v) (M.toList obj)), " }" ]
+runtimeValueToTypst (RVComp idents body s) = concat
+    [ "(", "(", intercalate "," (map (\i -> "\"" ++ i ++ "\"") idents), ")", ", ", show body, ", \"", s, "\")" ]
+
+localsToTypst :: M.Map (String, String) RuntimeValue -> String
+localsToTypst = unlines
+              . map (\((s, i), v) -> "(\"" ++ s ++ "\",\"" ++ i ++ "\") -> " ++ runtimeValueToTypst v ++ "\\")
+              . M.toList
 
 traceToTypst :: Trace -> String
-traceToTypst = unlines . map lineToTypst . takeUntilFirstRight
+traceToTypst = tupleToTypst . traceToTuple
     where
-        lineToTypst (Left (st, rule)) = amStateToTypst st ++ " " ++ ruleToTypst rule ++ "\\"
-        lineToTypst (Right st) = amStateToTypst st
-        amStateToTypst (AMState stack _ _ _ _ _) = "[" ++ unwords (map showSyntaxConstructor stack) ++ "]"
-        ruleToTypst r = "attach(limits(=>),t:" ++ r ++ ")"
+        tupleToTypst (start, rules, end) = unlines
+            [ amStateToTypst start ++ "\\"
+            , unlines (map ruleToTypst rules) ++ "\\"
+            , amStateToTypst end ++ "\\" ]
+        amStateToTypst (AMState _ _ locals _ _ _) = localsToTypst locals
+        ruleToTypst r = "tick(" ++ r ++ ")"
 
 showValueConstructor :: RuntimeValue -> String
 showValueConstructor (RVInt _) = "RVInt"
