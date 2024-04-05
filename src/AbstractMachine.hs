@@ -5,6 +5,7 @@ import Data.Map qualified as M
 import Data.List (intercalate)
 
 import AST qualified
+import Auxiliary
 
 data RuntimeSyntax
     = SrcFile AST.SrcFile
@@ -78,7 +79,7 @@ traceToTypst = tupleToTypst . traceToTuple
     where
         tupleToTypst (start, rules, end) = unlines
             [ amStateToTypst start ++ "\\"
-            , unlines (map ruleToTypst rules) ++ "\\"
+            , unlines (appendAtEveryN 9 '\\' (map ruleToTypst rules)) ++ "\\"
             , amStateToTypst end ++ "\\" ]
         amStateToTypst (AMState _ _ locals _ _ _) = localsToTypst locals
         ruleToTypst r = "tick(" ++ r ++ ")"

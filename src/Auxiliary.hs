@@ -23,3 +23,10 @@ partition :: [(a, Either b c)] -> ([(a, b)], [(a, c)])
 partition = foldr f ([], [])
     where
         f (a, e) (ls, rs) = either (\l -> ((a, l) : ls, rs)) (\r -> (ls, (a, r) : rs)) e
+
+appendAtEveryN :: Int -> a -> [[a]] -> [[a]]
+appendAtEveryN n x = go n
+    where
+        go _ [] = []
+        go 0 (xs : xxs) = (xs ++ [x]) : go n xxs
+        go m (xs : xxs) = xs : go (m - 1) xxs
