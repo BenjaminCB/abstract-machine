@@ -49,8 +49,9 @@ main = do
                 Left err -> do
                     putStrLn "Abstract Machine Error:"
                     putStrLn err
-                Right (locals, trace) -> do
+                Right (locals, (cost, trace)) -> do
                     prettyPrintLocals locals
+                    putStrLn $ "cost: " ++ show cost
                     putStrLn "trace:"
                     putStrLn $ AM.traceToTypst trace
         Nothing -> do
