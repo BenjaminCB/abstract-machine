@@ -53,10 +53,10 @@ semi = Token.semi lexer
 comma :: Parser String
 comma = Token.comma lexer
 
-parseInput :: String -> Either ParseError SrcFile
+parseInput :: String -> Either ParseError (SrcFile String)
 parseInput = parse (whiteSpace >> srcFile) ""
 
-srcFile :: Parser SrcFile
+srcFile :: Parser (SrcFile String)
 srcFile = do
     imports <- many importDecl
     stmts <- many statement
@@ -65,7 +65,7 @@ srcFile = do
 
 -- import * as x from "path"
 -- import { x, y } from "path"
-importDecl :: Parser Import
+importDecl :: Parser (Import String)
 importDecl = (try importStar <|> importList) <* semi
     where
         importStar = do

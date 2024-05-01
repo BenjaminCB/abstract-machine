@@ -4,10 +4,12 @@ import Data.Bifunctor (first)
 import Data.Map qualified as M
 import System.Environment (getArgs)
 import Text.Parsec (ParseError)
+import Control.Monad.State (evalState)
 
 import AbstractMachine qualified as AM
 import Auxiliary
 import Parser
+import TypeChecker
 
 newlines :: Int -> IO ()
 newlines = putStr . concat . flip replicate "\n"
@@ -53,5 +55,8 @@ main = do
                     prettyPrintLocals locals
                     putStrLn "trace:"
                     putStrLn $ AM.traceToTypst trace
+            let unpacked = unpackSrcFile fileGetter entryPoint
+            let constraints = evalState (srcFileConstraints unpacked) M.empty
+            print constraints
         Nothing -> do
             putStrLn "Entry point not found"
