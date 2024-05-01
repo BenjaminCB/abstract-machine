@@ -1,12 +1,19 @@
 module AST where
 
-data SrcFile = SrcFile [Import] [Stmt] [Export]
+data SrcFile a = SrcFile [Import a] [Stmt] [Export]
     deriving (Show, Eq)
 
-data Import
-    = ImportStar String String
-    | ImportList [String] String
+instance Functor SrcFile where
+    fmap f (SrcFile is ss es) = SrcFile (map (fmap f) is) ss es
+
+data Import a
+    = ImportStar String a
+    | ImportList [String] a
     deriving (Show, Eq)
+
+instance Functor Import where
+    fmap f (ImportStar s a) = ImportStar s (f a)
+    fmap f (ImportList ss a) = ImportList ss (f a)
 
 newtype Export = Export String
     deriving (Show, Eq)

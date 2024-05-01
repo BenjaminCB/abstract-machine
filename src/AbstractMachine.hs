@@ -8,8 +8,8 @@ import AST qualified
 import Auxiliary
 
 data RuntimeSyntax
-    = SrcFile AST.SrcFile
-    | Import AST.Import
+    = SrcFile (AST.SrcFile String)
+    | Import (AST.Import String)
     | Export AST.Export
     | Stmt AST.Stmt
     | Expr AST.Expr
@@ -48,7 +48,7 @@ data RuntimeValue
     | RVComp [String] [AST.Stmt] String
     deriving (Eq, Show)
 
-data AMState = AMState [RuntimeSyntax] (M.Map String AST.SrcFile) (M.Map (String, String) RuntimeValue) (M.Map String RuntimeValue) [RuntimeValue] [String]
+data AMState = AMState [RuntimeSyntax] (M.Map String (AST.SrcFile String)) (M.Map (String, String) RuntimeValue) (M.Map String RuntimeValue) [RuntimeValue] [String]
     deriving (Eq, Show)
 
 type Trace = [Either (AMState, String) AMState]
@@ -116,24 +116,24 @@ exportLookup v exports = case M.lookup v exports of
 
 fileLookup ::
     String ->
-    M.Map String AST.SrcFile ->
-    Either String AST.SrcFile
+    M.Map String (AST.SrcFile String) ->
+    Either String (AST.SrcFile String)
 fileLookup f files = case M.lookup f files of
     Just src -> Right src
     Nothing -> Left $ "File " ++ f ++ " not found"
 
 runFile ::
     String ->
-    AST.SrcFile ->
-    M.Map String AST.SrcFile ->
+    AST.SrcFile String ->
+    M.Map String (AST.SrcFile String) ->
     Either String (M.Map (String, String) RuntimeValue)
 runFile entryPoint src fileGetter =
     evalStateT (run (AMState [SrcFile src] fileGetter M.empty M.empty [] [entryPoint])) []
 
 runFileWithState ::
     String ->
-    AST.SrcFile ->
-    M.Map String AST.SrcFile ->
+    AST.SrcFile String ->
+    M.Map String (AST.SrcFile String) ->
     Either String (M.Map (String, String) RuntimeValue, Trace)
 runFileWithState entryPoint src fileGetter =
     runStateT (run (AMState [SrcFile src] fileGetter M.empty M.empty [] [entryPoint])) []
