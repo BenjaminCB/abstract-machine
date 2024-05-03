@@ -5,6 +5,7 @@ import Data.Map qualified as M
 import System.Environment (getArgs)
 import Text.Parsec (ParseError)
 import Control.Monad.State (evalState)
+import Data.List (nub)
 
 import AbstractMachine qualified as AM
 import Auxiliary
@@ -56,7 +57,7 @@ main = do
                     putStrLn "trace:"
                     putStrLn $ AM.traceToTypst trace
             let unpacked = unpackSrcFile fileGetter entryPoint
-            let constraints = evalState (srcFileConstraints unpacked) M.empty
-            print constraints
+            let constraints = nub $ evalState (srcFileConstraints unpacked) (M.empty, 0)
+            mapM_ putStrLn [show c ++ "\\" | c <- constraints]
         Nothing -> do
             putStrLn "Entry point not found"

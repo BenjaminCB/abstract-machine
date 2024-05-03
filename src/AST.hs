@@ -31,15 +31,30 @@ data Expr
     | Lit Lit
     | Proj String String
     | BO BinOp Expr Expr
-    deriving (Show, Eq)
+    deriving (Eq)
+
+instance Show Expr where
+    show (Var x) = x
+    show (Lit l) = show l
+    show (Proj x y) = x ++ "." ++ y
+    show (BO op e1 e2) = show e1 ++ " " ++ show op ++ " " ++ show e2
 
 data Lit
     = IntLit Int
     | CompLit [String] [Stmt]
-    deriving (Show, Eq)
+    deriving (Eq)
+
+instance Show Lit where
+    show (IntLit i) = show i
+    show (CompLit ss stmts) = "comp(" ++ show ss ++ ", " ++ show stmts ++ ")"
 
 data BinOp
     = Add
     | Sub
     | NotEq
-    deriving (Show, Eq)
+    deriving (Eq)
+
+instance Show BinOp where
+    show Add = "+"
+    show Sub = "-"
+    show NotEq = "!="
