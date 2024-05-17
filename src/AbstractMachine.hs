@@ -193,6 +193,14 @@ run st@(AMState wstack@(While' cond body : stack) fg ls es (RVInt n : vs) ss) = 
     modify (++[Left(st ,"While'")])
     run (AMState (if n /= 0 then map Stmt body ++ [Expr cond] ++ wstack else stack) fg ls es vs ss)
 
+-- for rule
+run st@(AMState (Stmt (AST.For x lb ub body) : stack) fg ls es vs ss) = do
+    modify (++[Left(st, "Stmt")])
+    let range = map (AST.Lit . AST.IntLit) [lb..ub]
+    let binds = map (AST.Let x) range
+    let loopUnfold = concat [ b : body | b <- binds ]
+    run (AMState (map Stmt loopUnfold ++ stack) fg ls es vs ss)
+
 -- let and assign
 run st@(AMState (Stmt (AST.Let ident e) : stack) fg ls es vs ss) = do
     modify (++[Left(st ,"Stmt")])

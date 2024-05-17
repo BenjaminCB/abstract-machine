@@ -75,6 +75,9 @@ stmtConstraints (While e s) = do
     c1 <- exprConstraints e
     c2 <- mapM stmtConstraints s
     return $ c1 ++ concat c2
+stmtConstraints (For _ _ _ s) = do
+    c3 <- mapM stmtConstraints s
+    return $ concat c3
 stmtConstraints (Assign x e) = do
     c1 <- exprConstraints e
     return $ c1 ++ [InEnv x]

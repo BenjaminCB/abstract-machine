@@ -24,6 +24,7 @@ data Stmt
     | If Expr [Stmt] [Stmt]
     | While Expr [Stmt]
     | CompCall Expr [Expr]
+    | For String Int Int [Stmt]
     deriving (Show, Eq)
 
 data Expr
