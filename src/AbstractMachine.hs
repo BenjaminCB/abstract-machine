@@ -24,6 +24,7 @@ data RuntimeSyntax
     | BindExports String
     | EmptyExports
     | PopScope
+    | PushScope String
     deriving (Eq, Show)
 
 showSyntaxConstructor :: RuntimeSyntax -> String
@@ -42,6 +43,7 @@ showSyntaxConstructor (BindExport _) = "BindExport"
 showSyntaxConstructor (BindExports _) = "BindExports"
 showSyntaxConstructor EmptyExports = "EmptyExports"
 showSyntaxConstructor PopScope = "PopScope"
+showSyntaxConstructor (PushScope _) = "PushScope"
 
 data RuntimeValue
     = RVInt Int
@@ -83,7 +85,7 @@ traceToTypst = tupleToTypst . traceToTuple
             , unlines (appendAtEveryN 9 '\\' (map ruleToTypst rules)) ++ "\\"
             , amStateToTypst end ++ "\\" ]
         amStateToTypst (AMState _ _ locals _ _ _) = localsToTypst locals
-        ruleToTypst r = "tick(" ++ r ++ ")"
+        ruleToTypst r = "(" ++ r ++ ")"
 
 showValueConstructor :: RuntimeValue -> String
 showValueConstructor (RVInt _) = "RVInt"
@@ -158,15 +160,15 @@ run st@(AMState [] _ locals _ _ _) = do
 
 -- srcfile
 run st@(AMState (SrcFile (AST.SrcFile imports stmts exports) : stack) fg ls es vs ss) = do
-    pushTrace st "SrcFile"
+    pushTrace st "SrcFileA"
     run (AMState (map Import imports ++ map Stmt stmts ++ map Export exports ++ stack) fg ls es vs ss)
 
 -- binoperations
 run st@(AMState (Expr (AST.BO bo e1 e2) : stack) fg ls es vs ss) = do
-    pushTrace st "BinOp1"
+    pushTrace st "BinOp1A"
     run (AMState (Expr e1 : Expr e2 : BinOp bo : stack) fg ls es vs ss)
 run st@(AMState (BinOp bo : stack) fg ls es (RVInt n2 : RVInt n1 : vs) ss) = do
-    pushTrace st "BinOp2"
+    pushTrace st "BinOp2A"
     run (AMState stack fg ls es (RVInt (op bo) : vs) ss)
     where
         op AST.Add = n1 + n2
@@ -175,13 +177,13 @@ run st@(AMState (BinOp bo : stack) fg ls es (RVInt n2 : RVInt n1 : vs) ss) = do
 
 -- var
 run st@(AMState (Expr (AST.Var v) : stack) fg ls es vs (s : ss)) = do
-    pushTrace st "Var"
+    pushTrace st "VarA"
     val <- lift $ localLookup s v ls
     run (AMState stack fg ls es (val : vs) (s : ss))
 
 -- proj
 run st@(AMState (Expr (AST.Proj ident field) : stack) fg ls es vs (s : ss)) = do
-    pushTrace st "Proj"
+    pushTrace st "ProjA"
     val <- lift $ localLookup s ident ls
     case val of
         RVObj obj -> case M.lookup field obj of
@@ -191,23 +193,23 @@ run st@(AMState (Expr (AST.Proj ident field) : stack) fg ls es vs (s : ss)) = do
 
 -- if rules
 run st@(AMState (Stmt (AST.If cond t f) : stack) fg ls es vs ss) = do
-    pushTrace st "If"
+    pushTrace st "IfA"
     run (AMState (Expr cond : Branch t f : stack) fg ls es vs ss)
 run st@(AMState (Branch t f : stack) fg ls es (RVInt n : vs) ss) = do
-    pushTrace st "Branch"
+    pushTrace st "BranchA"
     run (AMState (if n /= 0 then map Stmt t else map Stmt f ++ stack) fg ls es vs ss)
 
 -- while rules
 run st@(AMState (Stmt (AST.While cond body) : stack) fg ls es vs ss) = do
-    pushTrace st "While"
+    pushTrace st "WhileA"
     run (AMState (Expr cond : While' cond body : stack) fg ls es vs ss)
 run st@(AMState wstack@(While' cond body : stack) fg ls es (RVInt n : vs) ss) = do
-    pushTrace st "While'"
+    pushTrace st "WhilePA"
     run (AMState (if n /= 0 then map Stmt body ++ [Expr cond] ++ wstack else stack) fg ls es vs ss)
 
 -- for rule
 run st@(AMState (Stmt (AST.For x lb ub body) : stack) fg ls es vs ss) = do
-    pushTrace st "For"
+    pushTrace st "ForA"
     let range = map (AST.Lit . AST.IntLit) [lb..ub]
     let binds = map (AST.Let x) range
     let loopUnfold = concat [ b : body | b <- binds ]
@@ -215,73 +217,77 @@ run st@(AMState (Stmt (AST.For x lb ub body) : stack) fg ls es vs ss) = do
 
 -- let and assign
 run st@(AMState (Stmt (AST.Let ident e) : stack) fg ls es vs ss) = do
-    pushTrace st "Let"
+    pushTrace st "LetA"
     run (AMState (Expr e : Bind ident : stack) fg ls es vs ss)
 run st@(AMState (Bind ident : stack) fg ls es (v : vs) (s : ss)) = do
-    pushTrace st "Bind"
+    pushTrace st "BindA"
     addCost (+1)
     run (AMState stack fg (localInsert s ident v ls) es vs (s : ss))
 run st@(AMState (Stmt (AST.Assign ident e) : stack) fg ls es vs ss) = do
-    pushTrace st "Assign"
+    pushTrace st "AssignA"
     run (AMState (Expr e : Bind ident : stack) fg ls es vs ss)
 
 -- imports
 run st@(AMState (Import (AST.ImportStar ident f) : stack) fg ls es vs ss) = do
-    pushTrace st "Import1"
+    pushTrace st "ImportAllA"
     addCost (+2)
     src <- lift $ fileLookup f fg
     run (AMState (SrcFile src : PopScope : BindExports ident : EmptyExports : stack) fg ls es vs (f : ss))
 run st@(AMState (Import (AST.ImportList idents f) : stack) fg ls es vs ss) = do
-    pushTrace st "Import2"
+    pushTrace st "ImportSelectedA"
     addCost (+2)
     src <- lift $ fileLookup f fg
     run (AMState (SrcFile src : PopScope : map BindExport idents ++ EmptyExports : stack) fg ls es vs (f : ss))
 run st@(AMState (PopScope : stack) fg ls es vs (_ : ss)) = do
-    pushTrace st "PopScope"
+    pushTrace st "PopScopeA"
     run (AMState stack fg ls es vs ss)
+run st@(AMState (PushScope s : stack) fg ls es vs ss) = do
+    pushTrace st "PushScopeA"
+    run (AMState stack fg ls es vs (s : ss))
 run st@(AMState (EmptyExports : stack) fg ls _ vs ss) = do
-    pushTrace st "EmptyExports"
+    pushTrace st "EmptyExportsA"
     run (AMState stack fg ls M.empty vs ss)
 run st@(AMState (BindExports ident : stack) fg ls es vs (s : ss)) = do
-    pushTrace st "BindAll"
+    pushTrace st "BindAllA"
     addCost (+1)
     run (AMState stack fg (localInsert s ident (RVObj es) ls) es vs (s : ss))
 run st@(AMState (BindExport ident : stack) fg ls es vs (s : ss)) = do
-    pushTrace st "BindSelected"
+    pushTrace st "BindSelectedA"
     addCost (+1)
     val <- lift $ exportLookup ident es
     run (AMState stack fg (localInsert s ident val ls) es vs (s : ss))
 
 -- export
 run st@(AMState (Export (AST.Export ident) : stack) fg ls es vs (s : ss)) = do
-    pushTrace st "Export"
+    pushTrace st "ExportA"
     addCost (+1)
     val <- lift $ localLookup s ident ls
     run (AMState stack fg ls (M.insert ident val es) vs (s : ss))
 
 -- literals
-run st@(AMState (Expr (AST.Lit lit) : stack) fg ls es vs ss) = do
-    pushTrace st "ExprLit"
-    run (AMState (Lit lit : stack) fg ls es vs ss)
-run st@(AMState (Lit (AST.IntLit n) : stack) fg ls es vs ss) = do
-    pushTrace st "Int"
+-- run st@(AMState (Expr (AST.Lit lit) : stack) fg ls es vs ss) = do
+--     pushTrace st "ImplementationA"
+--     run (AMState (Lit lit : stack) fg ls es vs ss)
+run st@(AMState (Expr (AST.Lit (AST.IntLit n)) : stack) fg ls es vs ss) = do
+    pushTrace st "NumA"
     run (AMState stack fg ls es (RVInt n : vs) ss)
-run st@(AMState (Lit (AST.CompLit idents body) : stack) fg ls es vs (s : ss)) = do
-    pushTrace st "Comp"
+run st@(AMState (Expr (AST.Lit (AST.CompLit idents body)) : stack) fg ls es vs (s : ss)) = do
+    pushTrace st "CompDefA"
     run (AMState stack fg ls es (RVComp idents body s : vs) (s : ss))
 
 -- compcall
 run st@(AMState (Stmt (AST.CompCall comp args) : stack) fg ls es vs ss) = do
-    pushTrace st "CompCall"
+    pushTrace st "CompCallA"
     run (AMState (Expr comp : CompCall' args : stack) fg ls es vs ss)
 run st@(AMState (CompCall' args : stack) fg ls es (RVComp idents body s : vs) ss) = do
-    pushTrace st "CompCall'"
-    run (AMState (lets ++ stmts ++ [PopScope] ++ stack) fg ls es vs (s : ss))
+    pushTrace st "CompCallPA"
+    run (AMState (exprs ++ [PushScope s] ++ binds ++ stmts ++ [PopScope] ++ stack) fg ls es vs ss)
     where
-        lets = zipWith (\i a -> Stmt (AST.Let i a)) idents args
+        exprs = map Expr args
+        binds = reverse $ map Bind idents
         stmts = map Stmt body
 
 -- failure
 run (AMState {}) = do
     trace <- get
-    lift $ Left $ "Failure: " ++ show trace
+    lift $ Left $ traceToTypst (snd trace)
