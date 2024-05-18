@@ -37,6 +37,8 @@ common shared
     AST
     Auxiliary
     Parser
+    TypeChecker
+    RecursionSchemes
 
   build-depends:
     , base
