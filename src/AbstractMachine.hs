@@ -85,7 +85,7 @@ traceToTypst = tupleToTypst . traceToTuple
             , unlines (appendAtEveryN 9 '\\' (map ruleToTypst rules)) ++ "\\"
             , amStateToTypst end ++ "\\" ]
         amStateToTypst (AMState _ _ locals _ _ _) = localsToTypst locals
-        ruleToTypst r = "(" ++ r ++ ")"
+        ruleToTypst r = r
 
 showValueConstructor :: RuntimeValue -> String
 showValueConstructor (RVInt _) = "RVInt"
