@@ -22,6 +22,9 @@ languageDef =
             , "from"
             , "as"
             , "*"
+            , "for"
+            , "in"
+            , "to"
             ]
         , Token.commentLine = "--"
         }
@@ -90,7 +93,7 @@ exportDecl = do
     return $ Export ident
 
 statement :: Parser Stmt
-statement = whiteSpace *> choice [ifStmt, whileStmt, compCallStmt, letStmt, assignStmt] <* semi
+statement = whiteSpace *> choice [ifStmt, whileStmt, forStmt, compCallStmt, letStmt, assignStmt] <* semi
     where
         ifStmt = do
             reserved "if"
@@ -104,6 +107,19 @@ statement = whiteSpace *> choice [ifStmt, whileStmt, compCallStmt, letStmt, assi
             cond <- parens expression
             stmts <- braces $ many statement
             return $ While cond stmts
+        forStmt = do
+            reserved "for"
+            spaces
+            _ <- char '('
+            x <- identifier
+            reserved "in"
+            lb <- integer
+            reserved "to"
+            ub <- integer
+            _ <- char ')'
+            spaces
+            stmts <- braces $ many statement
+            return $ For x (fromIntegral lb) (fromIntegral ub) stmts
         compCallStmt = do
             reserved "comp"
             compExpr <- expression
