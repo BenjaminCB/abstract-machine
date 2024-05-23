@@ -42,17 +42,6 @@ freshN n = do
     ss <- freshN (n - 1)
     return $ s : ss
 
-unsafeLookup :: Ord k => k -> M.Map k v -> v
-unsafeLookup k m = case M.lookup k m of
-  Just v -> v
-  Nothing -> error "unsafeLookup: key not found"
-
--- | TODO should probably make a safe version of this
-unpackSrcFile :: M.Map String (SrcFile String) -> String -> Term SrcFile
-unpackSrcFile srcFiles name = In $ SrcFile is' ss es where
-    SrcFile is ss es = unsafeLookup name srcFiles
-    is' = map (fmap (unpackSrcFile srcFiles)) is
-
 srcFileConstraints :: Term SrcFile -> ConstraintState [Constraint]
 srcFileConstraints = cata f where
     f (SrcFile is ss es) = do
