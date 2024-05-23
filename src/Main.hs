@@ -10,7 +10,7 @@ import Data.List (nub)
 import AbstractMachine qualified as AM
 import Auxiliary
 import Parser
-import TypeChecker
+import ConstraintGeneration
 
 newlines :: Int -> IO ()
 newlines = putStr . concat . flip replicate "\n"

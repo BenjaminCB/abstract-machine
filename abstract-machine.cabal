@@ -38,6 +38,7 @@ common shared
     Auxiliary
     Parser
     TypeChecker
+    ConstraintGeneration
     RecursionSchemes
 
   build-depends:
