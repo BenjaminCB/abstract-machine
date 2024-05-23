@@ -14,7 +14,7 @@ data Type = S_Type SType
 data SType = Number Int
            | Variable String
            | Addition SType SType
-           | Multiplication String SType
+           | Multiplication SType SType
            | Maximum SType SType
            deriving (Show, Eq)
 
@@ -44,14 +44,22 @@ fresh str = do
     put (s + 1)
     return $ str ++ "_" ++ show s
 
+sat :: Bool -> String -> Either String ()
+sat True _ = Right ()
+sat False msg = Left msg
+
 envLookup :: String -> TypeEnv -> Either String Type
 envLookup k env = case M.lookup k env of
     Just v -> Right v
     Nothing -> Left $ "envLookup: key not found: " ++ k
 
 srcFileTypeCheck :: Term SrcFile -> TypeEnv -> Either String (SType, TypeEnv)
-srcFileTypeCheck srcFile env = cata f srcFile where
-    f (SrcFile is ss es) = undefined
+srcFileTypeCheck srcFile env = cata f srcFile env where
+    f (SrcFile is ss es) _ = do
+        (t1, env') <- importsTypeCheck is env
+        (t2, env'') <- evalStateT (stmtsTypeCheck ss env') 0
+        (t3, env''') <- exportsTypeCheck es env''
+        return (Addition (Addition t1 t2) t3, env''')
 
 importTypeCheck :: Import (TypeEnv -> Either String (SType, TypeEnv)) -> TypeEnv -> Either String (SType, TypeEnv)
 importTypeCheck (ImportStar ident s) env = do
@@ -68,6 +76,13 @@ importTypeCheck (ImportList ids s) env = do
             return (Addition t (Number 2), env' <<: matches <: ("epsilon", E_Type $ Record []))
         _ -> Left "importTypeCheck: importList: exports not a record"
 
+importsTypeCheck :: [Import (TypeEnv -> Either String (SType, TypeEnv))] -> TypeEnv -> Either String (SType, TypeEnv)
+importsTypeCheck [] env = Right (Number 0, env)
+importsTypeCheck (i:is) env = do
+    (t1, env') <- importTypeCheck i env
+    (t2, env'') <- importsTypeCheck is env'
+    return (Addition t1 t2, env'')
+
 stmtTypeCheck :: Stmt -> TypeEnv -> StateT Int (Either String) (SType, TypeEnv)
 stmtTypeCheck (While e ss) env = do
     t1 <- exprTypeCheck e env
@@ -75,9 +90,36 @@ stmtTypeCheck (While e ss) env = do
     x <- fresh "x"
     case t1 of
         Cost t1' -> do
-            let t = Addition (Multiplication x (Addition t1' t2)) t1'
+            let t = Addition (Multiplication (Variable x) (Addition t1' t2)) t1'
             return (t, env')
-
+        _ -> lift $ Left "stmtTypeCheck: while: not a cost"
+stmtTypeCheck (For ident n m ss) env = do
+    lift $ sat (n <= m) "stmtTypeCheck: for: n > m"
+    (t1, env') <- stmtsTypeCheck ss (env <: (ident, S_Type $ Number n))
+    let diff = Number $ m - n + 1
+    let t = Addition (Multiplication diff t1) diff
+    return (t, env')
+stmtTypeCheck (CompCall _ _) env = undefined
+stmtTypeCheck (If e ss1 ss2) env = do
+    t0 <- exprTypeCheck e env
+    (t1, env') <- stmtsTypeCheck ss1 env
+    (t2, env'') <- stmtsTypeCheck ss2 env
+    case t0 of
+        Cost t -> return (Addition (Maximum t1 t2) t, env' \/ env'')
+        _ -> lift $ Left "stmtTypeCheck: if: not a cost"
+stmtTypeCheck (Let x e) env = do
+    t <- exprTypeCheck e env
+    case t of
+        Cost t' -> return (Addition t' (Number 1), env <: (x, S_Type $ Number 0))
+        Function _ _ -> return (Number 1, env <: (x, E_Type t))
+        Record _ -> return (Number 1, env <: (x, E_Type t))
+stmtTypeCheck (Assign x e) env = do
+    lift $ sat (M.member x env) "stmtTypeCheck: assign: x not in env"
+    t <- exprTypeCheck e env
+    case t of
+        Cost t' -> return (Addition t' (Number 1), env <: (x, S_Type $ Number 0))
+        Function _ _ -> return (Number 1, env <: (x, E_Type t))
+        Record _ -> return (Number 1, env <: (x, E_Type t))
 
 stmtsTypeCheck :: [Stmt] -> TypeEnv -> StateT Int (Either String) (SType, TypeEnv)
 stmtsTypeCheck [] env = return (Number 0, env)
@@ -86,8 +128,25 @@ stmtsTypeCheck (s:ss) env = do
     (t2, env'') <- stmtsTypeCheck ss env'
     return (Addition t1 t2, env'')
 
+exportTypeCheck :: Export -> TypeEnv -> Either String (SType, TypeEnv)
+exportTypeCheck (Export ident) env = do
+    t <- envLookup ident env
+    exports <- envLookup "epsilon" env
+    case (exports, t) of
+        (E_Type (Record fields), E_Type t') -> do
+            let exports' = E_Type $ Record $ (ident, t') : fields
+            return (Number 1, env <: ("epsilon", exports'))
+        _ -> Left "exportTypeCheck: not a record"
+
+exportsTypeCheck :: [Export] -> TypeEnv -> Either String (SType, TypeEnv)
+exportsTypeCheck [] env = Right (Number 0, env)
+exportsTypeCheck (e:es) env = do
+    (t1, env') <- exportTypeCheck e env
+    (t2, env'') <- exportsTypeCheck es env'
+    return (Addition t1 t2, env'')
+
 exprTypeCheck :: Expr -> TypeEnv -> StateT Int (Either String) EType
-exprTypeCheck (Lit (IntLit _)) env = return (Cost $ Number 0)
+exprTypeCheck (Lit (IntLit _)) _ = return (Cost $ Number 0)
 exprTypeCheck (Var x) env = do
     t <- lift $ envLookup x env
     case t of
@@ -111,7 +170,14 @@ exprTypeCheck (Proj ident1 ident2) env = do
             Just t' -> return t'
             Nothing -> lift $ Left "exprTypeCheck: proj: field not found"
         _ -> lift $ Left "exprTypeCheck: proj: not a record"
-exprTypeCheck (Lit (CompLit ids _)) env = do
+exprTypeCheck (Lit (CompLit ids _)) _ = do
     freshTypeVar <- fresh "t"
     let t = Function ids freshTypeVar
     return t
+
+exprsTypeCheck :: [Expr] -> TypeEnv -> StateT Int (Either String) [EType]
+exprsTypeCheck [] _ = return []
+exprsTypeCheck (e:es) env = do
+    t1 <- exprTypeCheck e env
+    t2 <- exprsTypeCheck es env
+    return $ t1 : t2
