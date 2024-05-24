@@ -28,8 +28,29 @@ type TypeEnv = M.Map String Type
 instance LUB Type where
     (\/) = undefined
 
+instance LUB SType where
+    Addition t1 t2 \/ Addition t3 t4 = Addition (t1 \/ t3) (t2 \/ t4)
+    Multiplication t1 t2 \/ Multiplication t3 t4 = Multiplication (t1 \/ t3) (t2 \/ t4)
+    Number n1 \/ Number n2 = Number (max n1 n2)
+    Variable x1 \/ Variable x2 = Maximum (Variable x1) (Variable x2)
+    Maximum t1 t2 \/ Maximum t3 t4 = Maximum (Maximum t1 t3) (Maximum t2 t4)
+    _ \/ _ = error "instance LUB SType: not implemented"
+
+instance LUB EType where
+    Cost t1 \/ Cost t2 = Cost (t1 \/ t2)
+    Function _ _ \/ Function _ _ = error "instance LUB EType: function: not implemented"
+    -- Function ids1 t1 \/ Function ids2 t2
+    --     | ids1 == ids2 = Function ids1 (t1 \/ t2)
+    --     | otherwise    = error "instance LUB EType: function: different ids"
+    Record fields1 \/ Record fields2
+        | map fst fields1 == map fst fields2 =
+            Record $ zipWith (\(k, v1) (_, v2) -> (k, v1 \/ v2)) fields1 fields2
+        | otherwise = error "instance LUB EType: record: different fields"
+    _ \/ _ = error "instance LUB EType: not implemented"
+
+
 instance LUB (M.Map String Type) where
-    (\/) = undefined
+    (\/) = M.unionWith (\/)
 
 (<:) :: Ord k => M.Map k v -> (k, v) -> M.Map k v
 m <: (k, v) = M.insert k v m
@@ -99,7 +120,7 @@ stmtTypeCheck (For ident n m ss) env = do
     let diff = Number $ m - n + 1
     let t = Addition (Multiplication diff t1) diff
     return (t, env')
-stmtTypeCheck (CompCall _ _) env = undefined
+stmtTypeCheck (CompCall _ _) _ = undefined
 stmtTypeCheck (If e ss1 ss2) env = do
     t0 <- exprTypeCheck e env
     (t1, env') <- stmtsTypeCheck ss1 env
