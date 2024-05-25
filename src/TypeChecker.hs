@@ -6,6 +6,7 @@ import Auxiliary
 
 import Data.Map qualified as M
 import Control.Monad.State.Lazy
+import Data.List (intercalate)
 
 data Type = S_Type SType
           | E_Type EType
@@ -16,12 +17,42 @@ data SType = Number Int
            | Addition SType SType
            | Multiplication SType SType
            | Maximum SType SType
-           deriving (Show, Eq)
+           deriving (Eq)
+
+instance Show SType where
+    show (Number n) = show n
+    show (Variable x) = x
+    show (Addition t1 t2) = "(" ++ show t1 ++ " + " ++ show t2 ++ ")"
+    show (Multiplication t1 t2) = "(" ++ show t1 ++ " * " ++ show t2 ++ ")"
+    show (Maximum t1 t2) = "(" ++ show t1 ++ " arrow.t " ++ show t2 ++ ")"
+
+sTypeRewriteRules :: SType -> SType
+sTypeRewriteRules (Addition (Number 0) t) = sTypeRewriteRules t
+sTypeRewriteRules (Addition t (Number 0)) = sTypeRewriteRules t
+sTypeRewriteRules (Multiplication (Number 0) _) = Number 0
+sTypeRewriteRules (Multiplication _ (Number 0)) = Number 0
+sTypeRewriteRules (Multiplication (Number 1) t) = sTypeRewriteRules t
+sTypeRewriteRules (Multiplication t (Number 1)) = sTypeRewriteRules t
+sTypeRewriteRules (Maximum (Number 0) t) = sTypeRewriteRules t
+sTypeRewriteRules (Maximum t (Number 0)) = sTypeRewriteRules t
+sTypeRewriteRules (Addition (Number n1) (Number n2)) = Number (n1 + n2)
+sTypeRewriteRules (Multiplication (Number n1) (Number n2)) = Number (n1 * n2)
+sTypeRewriteRules (Maximum (Number n1) (Number n2)) = Number (max n1 n2)
+sTypeRewriteRules (Number n) = Number n
+sTypeRewriteRules (Variable x) = Variable x
+sTypeRewriteRules (Addition t1 t2) = Addition (sTypeRewriteRules t1) (sTypeRewriteRules t2)
+sTypeRewriteRules (Multiplication t1 t2) = Multiplication (sTypeRewriteRules t1) (sTypeRewriteRules t2)
+sTypeRewriteRules (Maximum t1 t2) = Maximum (sTypeRewriteRules t1) (sTypeRewriteRules t2)
 
 data EType = Cost SType
            | Function [String] String
            | Record [(String, EType)]
-           deriving (Show, Eq)
+           deriving (Eq)
+
+instance Show EType where
+    show (Cost t) = show t
+    show (Function ids t) = "(" ++ intercalate " -> " ids ++ " -> " ++ t ++ ")"
+    show (Record fields) = "({" ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ show v) fields) ++ "})"
 
 type TypeEnv = M.Map String Type
 
@@ -69,10 +100,10 @@ sat :: Bool -> String -> Either String ()
 sat True _ = Right ()
 sat False msg = Left msg
 
-envLookup :: String -> TypeEnv -> Either String Type
+envLookup :: (Ord k, Show k) => k -> M.Map k v -> Either String v
 envLookup k env = case M.lookup k env of
     Just v -> Right v
-    Nothing -> Left $ "envLookup: key not found: " ++ k
+    Nothing -> Left $ "envLookup: key not found: " ++ show k
 
 srcFileTypeCheck :: Term SrcFile -> TypeEnv -> Either String (SType, TypeEnv)
 srcFileTypeCheck srcFile env = cata f srcFile env where
@@ -120,7 +151,15 @@ stmtTypeCheck (For ident n m ss) env = do
     let diff = Number $ m - n + 1
     let t = Addition (Multiplication diff t1) diff
     return (t, env')
-stmtTypeCheck (CompCall _ _) _ = undefined
+stmtTypeCheck (CompCall comp args) env = do
+    t <- exprTypeCheck comp env
+    case t of
+        Function params t' -> do
+            lift $ sat (length params == length args) "stmtTypeCheck: compCall: wrong number of arguments"
+            _ <- exprsTypeCheck args env
+            return (Variable t', env)
+        _ -> lift $ Left "stmtTypeCheck: compCall: not a function"
+
 stmtTypeCheck (If e ss1 ss2) env = do
     t0 <- exprTypeCheck e env
     (t1, env') <- stmtsTypeCheck ss1 env
@@ -156,6 +195,9 @@ exportTypeCheck (Export ident) env = do
     case (exports, t) of
         (E_Type (Record fields), E_Type t') -> do
             let exports' = E_Type $ Record $ (ident, t') : fields
+            return (Number 1, env <: ("epsilon", exports'))
+        (E_Type (Record fields), S_Type t') -> do
+            let exports' = E_Type $ Record $ (ident, Cost t') : fields
             return (Number 1, env <: ("epsilon", exports'))
         _ -> Left "exportTypeCheck: not a record"
 

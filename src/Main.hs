@@ -4,13 +4,13 @@ import Data.Bifunctor (first)
 import Data.Map qualified as M
 import System.Environment (getArgs)
 import Text.Parsec (ParseError)
-import Control.Monad.State (evalState)
-import Data.List (nub)
+import Control.Monad.State (evalStateT)
 
 import AbstractMachine qualified as AM
 import Auxiliary
 import Parser
 import ConstraintGeneration
+import TypeChecker
 
 newlines :: Int -> IO ()
 newlines = putStr . concat . flip replicate "\n"
@@ -58,7 +58,15 @@ main = do
                     putStrLn "trace:"
                     putStrLn $ AM.traceToTypst trace
             let unpacked = unpackSrcFile fileGetter entryPoint
-            let constraints = nub $ evalState (srcFileConstraints unpacked) (M.empty, 0)
-            mapM_ putStrLn [show c ++ "\\" | c <- constraints]
+            let t = srcFileTypeCheck unpacked (M.singleton "epsilon" (E_Type $ Record []))
+            case t of
+                Left err -> putStrLn err
+                Right (t', _) -> print $ sTypeRewriteRules t'
+            let constraints = evalStateT (srcFileConstraints unpacked) (M.singleton "epsilon" (Record []))
+            case constraints of
+                Left err -> putStrLn err
+                Right cs -> do
+                    mapM_ putStrLn [show c ++ "\\" | c <- cs]
+            return ()
         Nothing -> do
             putStrLn "Entry point not found"
