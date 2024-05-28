@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Bennetzen
+    given-names: Benjamin
+title: "abstract-machine"
+version: 1.0.0
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.1003149
+    description: The concept DOI for the collection containing all versions of the Citation File Format.
+  - type: doi
+    value: 10.5281/zenodo.5171937
+    description: The versioned DOI for the version 1.2.0 of the Citation File Format.
+license: "MIT"
+date-released: "2024-05-28"
+repository-code: "https://github.com/BenjaminCB/abstract-machine"
