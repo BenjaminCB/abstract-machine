@@ -63,13 +63,15 @@ stmtConstraints (For ident _ _ s) = do
 stmtConstraints (Assign x e) = do
     env <- get
     t <- lift $ evalStateT (exprTypeCheck e (E_Type <$> env)) 0
+    cs <- exprConstraints e
     put $ env <: (x, t)
-    return []
+    return cs
 stmtConstraints (Let x e) = do
     env <- get
     t <- lift $ evalStateT (exprTypeCheck e (E_Type <$> env)) 0
+    cs <- exprConstraints e
     put $ env <: (x, t)
-    return []
+    return cs
 stmtConstraints (CompCall e es) = do
     env <- get
     t <- lift $ evalStateT (exprTypeCheck e (E_Type <$> env)) 0
@@ -81,7 +83,18 @@ stmtConstraints (CompCall e es) = do
             return cs
         _ -> lift $ Left "stmtConstraints: compCall: not a function"
 
+stmtsConstraints :: [Stmt] -> ConstraintState
+stmtsConstraints [] = return []
+stmtsConstraints (s:ss) = do
+    c1 <- stmtConstraints s
+    c2 <- stmtsConstraints ss
+    return $ c1 ++ c2
+
 exprConstraints :: Expr -> ConstraintState
+exprConstraints (Lit (CompLit params body)) = do
+    env <- get
+    put $ env <<: zip params (map (Cost . Variable) params)
+    stmtsConstraints body
 exprConstraints _ = return []
 
 exportConstraints :: Export -> ConstraintState
