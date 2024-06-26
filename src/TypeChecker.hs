@@ -45,13 +45,13 @@ sTypeRewriteRules (Multiplication t1 t2) = Multiplication (sTypeRewriteRules t1)
 sTypeRewriteRules (Maximum t1 t2) = Maximum (sTypeRewriteRules t1) (sTypeRewriteRules t2)
 
 data EType = Cost SType
-           | Function [String] String
+           | Function [String] SType
            | Record [(String, EType)]
            deriving (Eq)
 
 instance Show EType where
     show (Cost t) = show t
-    show (Function ids t) = "(" ++ intercalate " -> " ids ++ " -> " ++ t ++ ")"
+    show (Function ids t) = "(" ++ intercalate " -> " ids ++ " -> " ++ show t ++ ")"
     show (Record fields) = "({" ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ show v) fields) ++ "})"
 
 type TypeEnv = M.Map String Type
@@ -157,7 +157,7 @@ stmtTypeCheck (CompCall comp args) env = do
         Function params t' -> do
             lift $ sat (length params == length args) "stmtTypeCheck: compCall: wrong number of arguments"
             _ <- exprsTypeCheck args env
-            return (Variable t', env)
+            return (t', env)
         _ -> lift $ Left "stmtTypeCheck: compCall: not a function"
 
 stmtTypeCheck (If e ss1 ss2) env = do
@@ -233,9 +233,9 @@ exprTypeCheck (Proj ident1 ident2) env = do
             Just t' -> return t'
             Nothing -> lift $ Left "exprTypeCheck: proj: field not found"
         _ -> lift $ Left "exprTypeCheck: proj: not a record"
-exprTypeCheck (Lit (CompLit ids _)) _ = do
-    freshTypeVar <- fresh "t"
-    let t = Function ids freshTypeVar
+exprTypeCheck (Lit (CompLit ids body)) env = do
+    (ta, _) <- stmtsTypeCheck body (env <<: zip ids (map (E_Type . Cost . Variable) ids))
+    let t = Function ids ta
     return t
 
 exprsTypeCheck :: [Expr] -> TypeEnv -> StateT Int (Either String) [EType]
