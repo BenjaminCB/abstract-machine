@@ -61,7 +61,9 @@ main = do
             let t = srcFileTypeCheck unpacked (M.singleton "epsilon" (E_Type $ Record []))
             case t of
                 Left err -> putStrLn err
-                Right (t', _) -> print $ sTypeRewriteRules t'
+                Right (t', _) -> do
+                    print t'
+                    print $ sTypeRewriteRules t'
             let constraints = evalStateT (srcFileConstraints unpacked) (M.singleton "epsilon" (Record []))
             case constraints of
                 Left err -> putStrLn err

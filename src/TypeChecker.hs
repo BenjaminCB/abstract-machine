@@ -54,6 +54,10 @@ instance Show EType where
     show (Function ids t) = "(" ++ intercalate " -> " ids ++ " -> " ++ show t ++ ")"
     show (Record fields) = "({" ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ show v) fields) ++ "})"
 
+toNumber :: EType -> SType
+toNumber (Cost t) = t
+toNumber _ = Number 0
+
 type TypeEnv = M.Map String Type
 
 instance LUB Type where
@@ -125,7 +129,8 @@ importTypeCheck (ImportList ids s) env = do
         E_Type (Record fields) -> do
             -- TODO does not take into account if some id is not in exports
             let matches = foldr (\(k, v) acc -> if k `elem` ids then (k, E_Type v) : acc else acc) [] fields
-            return (Addition t (Number 2), env' <<: matches <: ("epsilon", E_Type $ Record []))
+            let t' = Addition (Number $ length matches) $ Addition (Number 2) t
+            return (t', env' <<: matches <: ("epsilon", E_Type $ Record []))
         _ -> Left "importTypeCheck: importList: exports not a record"
 
 importsTypeCheck :: [Import (TypeEnv -> Either String (SType, TypeEnv))] -> TypeEnv -> Either String (SType, TypeEnv)
@@ -147,7 +152,7 @@ stmtTypeCheck (While e ss) env = do
         _ -> lift $ Left "stmtTypeCheck: while: not a cost"
 stmtTypeCheck (For ident n m ss) env = do
     lift $ sat (n <= m) "stmtTypeCheck: for: n > m"
-    (t1, env') <- stmtsTypeCheck ss (env <: (ident, S_Type $ Number n))
+    (t1, env') <- stmtsTypeCheck ss (env <: (ident, S_Type $ Number 0))
     let diff = Number $ m - n + 1
     let t = Addition (Multiplication diff t1) diff
     return (t, env')
@@ -156,8 +161,9 @@ stmtTypeCheck (CompCall comp args) env = do
     case t of
         Function params t' -> do
             lift $ sat (length params == length args) "stmtTypeCheck: compCall: wrong number of arguments"
-            _ <- exprsTypeCheck args env
-            return (t', env)
+            ta <- exprsTypeCheck args env
+            let t'' = foldr1 Addition $ map toNumber ta ++ [t'] ++ replicate (length ta) (Number 1)
+            return (t'', env)
         _ -> lift $ Left "stmtTypeCheck: compCall: not a function"
 
 stmtTypeCheck (If e ss1 ss2) env = do
